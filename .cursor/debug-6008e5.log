@@ -1,0 +1,4 @@
+{"sessionId":"6008e5","runId":"run1","hypothesisId":"H1","location":"init-db.js:after-dotenv","message":"env load state","data":{"dotenvErr":null,"envPath":"D:\\final_project\\Back_End\\.env","hasMONGO_URI":true,"hasMONGO_URI_NONSRV":false,"mongoUriLen":86,"scheme":"srv","customDnsCount":2},"timestamp":1775623691110}
+{"sessionId":"6008e5","runId":"run1","hypothesisId":"H6","location":"init-db.js:checkDNS:before-lookup","message":"dns strategy","data":{"host":"cluster0.mcsb7bt.mongodb.net","hasMatch":true,"useSrv":true},"timestamp":1775623691133}
+{"sessionId":"6008e5","runId":"run1","hypothesisId":"H2","location":"init-db.js:checkDNS:lookup-ok","message":"resolveSrv ok","data":{"host":"cluster0.mcsb7bt.mongodb.net","useSrv":true},"timestamp":1775623691320}
+{"sessionId":"6008e5","runId":"run1","hypothesisId":"H3","location":"init-db.js:connectDB:mongoose-ok","message":"mongoose connected","data":{"readyState":1},"timestamp":1775623692651}
