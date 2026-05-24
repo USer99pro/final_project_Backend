@@ -5,9 +5,12 @@ const mongoose = require('mongoose');
 const Content = require('../models/Content');
 const Tag = require('../models/Tag');
 const Category = require('../models/Category');
-const { authenticate, requireAdmin, isOwnerOrAdmin } = require('../middleware/auth');
+const { authenticate, isOwnerOrAdmin } = require('../middleware/auth');
 const { uploadPdf, uploadDir } = require('../middleware/uploadPdf');
 const { stripVersion } = require('../utils/serialize');
+const { enrichContent } = require('../utils/paths');
+const { logActivity } = require('../utils/activity');
+const { buildResearchFilter } = require('../utils/searchFilter');
 
 const router = express.Router();
 
@@ -44,49 +47,86 @@ function removePdfFile(filename) {
   }
 }
 
-/** GET /api/contents — รายการเนื้อหา (login) */
-router.get('/', authenticate, async (req, res) => {
+function contentJson(doc, req) {
+  return stripVersion(enrichContent(doc, req));
+}
+
+function applyContentFields(item, body, user, isAdmin) {
+  const { title, description, abstract, category, tags, academicYear, major, studentName, status, isPublicDownload } =
+    body;
+
+  if (title != null) item.title = String(title).trim();
+  if (description != null) item.description = String(description).trim();
+  if (abstract != null) item.abstract = String(abstract).trim();
+  if (academicYear != null) item.academicYear = String(academicYear).trim();
+  if (studentName != null) item.studentName = String(studentName).trim();
+  if (major != null) item.major = String(major).trim();
+  else if (!item.major && user.major) item.major = user.major;
+
+  if (status != null) {
+    if (!['draft', 'published'].includes(status)) {
+      return { error: 'status ต้องเป็น draft หรือ published' };
+    }
+    item.status = status;
+    if (status === 'published') {
+      item.isPublicDownload = true;
+    }
+  }
+
+  if (isPublicDownload != null) {
+    item.isPublicDownload = isPublicDownload === true || isPublicDownload === 'true';
+  }
+
+  return null;
+}
+
+router.use(authenticate);
+
+router.get('/', async (req, res) => {
   try {
-    const filter = {};
-    if (req.user.role !== 'admin') filter.author = req.user._id;
-    if (req.query.category) filter.category = req.query.category;
-    if (req.query.tag) filter.tags = req.query.tag;
+    const filter =
+      req.user.role === 'admin'
+        ? buildResearchFilter(req.query, { publishedOnly: false })
+        : { author: req.user._id };
+
+    if (req.user.role !== 'admin') {
+      if (req.query.status) filter.status = req.query.status;
+    }
 
     const items = await Content.find(filter)
-      .populate('author', 'fullName email')
+      .populate('author', 'fullName email studentId major')
       .populate('category', 'name')
       .populate('tags', 'name')
       .sort({ createdAt: -1 });
 
-    res.json(items.map(stripVersion));
+    res.json(items.map((item) => contentJson(item, req)));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-/** GET /api/contents/:id */
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
     const item = await Content.findById(req.params.id)
-      .populate('author', 'fullName email')
+      .populate('author', 'fullName email studentId major')
       .populate('category', 'name description')
       .populate('tags', 'name');
     if (!item) return res.status(404).json({ error: 'ไม่พบเนื้อหา' });
     if (!isOwnerOrAdmin(item, req.user)) {
       return res.status(403).json({ error: 'ไม่มีสิทธิ์ดูเนื้อหานี้' });
     }
-    res.json(stripVersion(item));
+    res.json(contentJson(item, req));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-/** POST /api/contents — เพิ่มเนื้อหา + PDF (multipart) */
-router.post('/', authenticate, uploadPdf.single('pdf'), async (req, res) => {
+router.post('/', uploadPdf.single('pdf'), async (req, res) => {
   const uploadedPath = req.file?.path;
 
   try {
-    const { title, description, category, tags } = req.body;
+    const { title, description, abstract, category, tags, academicYear, major, studentName, status } =
+      req.body;
     if (!title) return res.status(400).json({ error: 'title จำเป็น' });
 
     const tagIds = parseIdList(tags).filter((id) => mongoose.Types.ObjectId.isValid(id));
@@ -99,30 +139,44 @@ router.post('/', authenticate, uploadPdf.single('pdf'), async (req, res) => {
       return res.status(refErr.status).json({ error: refErr.error });
     }
 
-    const item = await Content.create({
+    const item = new Content({
       title: String(title).trim(),
       description: description != null ? String(description).trim() : '',
+      abstract: abstract != null ? String(abstract).trim() : '',
+      studentName: studentName != null ? String(studentName).trim() : req.user.fullName,
+      major: major != null ? String(major).trim() : req.user.major || '',
+      academicYear: academicYear != null ? String(academicYear).trim() : '',
       author: req.user._id,
       category: categoryId,
       tags: tagIds,
       pdfFilename: req.file?.filename || '',
       pdfOriginalName: req.file?.originalname || '',
+      status: status === 'published' ? 'published' : 'draft',
+      isPublicDownload: true,
+    });
+
+    await item.save();
+    await logActivity({
+      contentId: item._id,
+      byUser: req.user._id,
+      fromStatus: '',
+      toStatus: item.status,
+      note: 'สร้างผลงานใหม่',
     });
 
     const populated = await Content.findById(item._id)
-      .populate('author', 'fullName email')
+      .populate('author', 'fullName email studentId major')
       .populate('category', 'name')
       .populate('tags', 'name');
 
-    res.status(201).json(stripVersion(populated));
+    res.status(201).json(contentJson(populated, req));
   } catch (err) {
     if (uploadedPath) removePdfFile(req.file?.filename);
     res.status(500).json({ error: err.message });
   }
 });
 
-/** PATCH /api/contents/:id — แก้ไข (multipart ได้) */
-router.patch('/:id', authenticate, uploadPdf.single('pdf'), async (req, res) => {
+router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
   const uploadedPath = req.file?.path;
 
   try {
@@ -133,12 +187,18 @@ router.patch('/:id', authenticate, uploadPdf.single('pdf'), async (req, res) => 
     }
     if (!isOwnerOrAdmin(item, req.user)) {
       if (uploadedPath) removePdfFile(req.file.filename);
-      return res.status(403).json({ error: 'แก้ไขได้เฉพาะเนื้อหาของตัวเอง (admin แก้ได้ทั้งหมด)' });
+      return res.status(403).json({ error: 'แก้ไขได้เฉพาะผลงานของตัวเอง' });
     }
 
-    const { title, description, category, tags } = req.body;
-    if (title != null) item.title = String(title).trim();
-    if (description != null) item.description = String(description).trim();
+    const prevStatus = item.status;
+    const isAdmin = req.user.role === 'admin';
+
+    const { category, tags } = req.body;
+    const fieldErr = applyContentFields(item, req.body, req.user, isAdmin);
+    if (fieldErr) {
+      if (uploadedPath) removePdfFile(req.file.filename);
+      return res.status(400).json(fieldErr);
+    }
 
     let categoryId = item.category;
     if (category !== undefined) {
@@ -168,30 +228,46 @@ router.patch('/:id', authenticate, uploadPdf.single('pdf'), async (req, res) => 
 
     await item.save();
 
+    if (prevStatus !== item.status) {
+      await logActivity({
+        contentId: item._id,
+        byUser: req.user._id,
+        fromStatus: prevStatus,
+        toStatus: item.status,
+        note: 'อัปเดตสถานะผลงาน',
+      });
+    }
+
     const populated = await Content.findById(item._id)
-      .populate('author', 'fullName email')
+      .populate('author', 'fullName email studentId major')
       .populate('category', 'name')
       .populate('tags', 'name');
 
-    res.json(stripVersion(populated));
+    res.json(contentJson(populated, req));
   } catch (err) {
     if (uploadedPath) removePdfFile(req.file.filename);
     res.status(500).json({ error: err.message });
   }
 });
 
-/** DELETE /api/contents/:id */
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const item = await Content.findById(req.params.id);
     if (!item) return res.status(404).json({ error: 'ไม่พบเนื้อหา' });
     if (!isOwnerOrAdmin(item, req.user)) {
-      return res.status(403).json({ error: 'ลบได้เฉพาะเนื้อหาของตัวเอง (admin ลบได้ทั้งหมด)' });
+      return res.status(403).json({ error: 'ลบได้เฉพาะผลงานของตัวเอง' });
     }
 
     removePdfFile(item.pdfFilename);
+    await logActivity({
+      contentId: item._id,
+      byUser: req.user._id,
+      fromStatus: item.status,
+      toStatus: 'deleted',
+      note: 'ลบผลงาน',
+    });
     await item.deleteOne();
-    res.json({ message: 'ลบเนื้อหาแล้ว', id: item._id });
+    res.json({ message: 'ลบผลงานแล้ว', id: item._id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -3,11 +3,14 @@ const bcrypt = require('bcrypt');
 
 const userSchema = new mongoose.Schema(
   {
+    studentId: { type: String, trim: true, sparse: true, unique: true },
     fullName: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, minlength: 6, select: false },
+    major: { type: String, trim: true, default: '' },
     phone: { type: String, trim: true, default: '' },
-    role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    role: { type: String, enum: ['graduate', 'admin', 'user'], default: 'graduate' },
+    isActive: { type: Boolean, default: true },
   },
   { timestamps: true, collection: 'users' }
 );
@@ -25,6 +28,7 @@ userSchema.methods.toPublicJSON = function toPublicJSON() {
   const o = this.toObject();
   delete o.password;
   delete o.__v;
+  if (o.role === 'user') o.role = 'graduate';
   return o;
 };
 

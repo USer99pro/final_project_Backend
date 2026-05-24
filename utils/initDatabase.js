@@ -2,6 +2,8 @@ const User = require('../models/User');
 const Content = require('../models/Content');
 const Tag = require('../models/Tag');
 const Category = require('../models/Category');
+const AuditLog = require('../models/AuditLog');
+const ActivityLog = require('../models/ActivityLog');
 const { connectDB, mongoose } = require('../config/db');
 
 const COLLECTIONS = [
@@ -9,12 +11,10 @@ const COLLECTIONS = [
   { name: 'contents', model: Content },
   { name: 'tags', model: Tag },
   { name: 'categories', model: Category },
+  { name: 'audit_logs', model: AuditLog },
+  { name: 'activity_logs', model: ActivityLog },
 ];
 
-/**
- * สร้าง/ซิงก์ฐานข้อมูล: collections, indexes และบัญชี admin คนแรก
- * ใช้ค่าจาก .env → ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_FULL_NAME
- */
 async function initializeDatabase(options = {}) {
   const { quiet = false } = options;
   const log = quiet ? () => {} : console.log;
@@ -32,12 +32,13 @@ async function initializeDatabase(options = {}) {
 
   log('📦 กำลังสร้าง collections และ indexes...');
   for (const { name, model } of COLLECTIONS) {
-    await model.createCollection().catch(() => {
-      /* collection มีอยู่แล้ว */
-    });
+    await model.createCollection().catch(() => {});
     await model.syncIndexes();
     log(`   ✓ ${name}`);
   }
+
+  const migrated = await User.updateMany({ role: 'user' }, { $set: { role: 'graduate' } });
+  if (migrated.modifiedCount) log(`   ✓ migrate role user→graduate: ${migrated.modifiedCount}`);
 
   log('👤 กำลังสร้างบัญชีผู้ดูแลระบบ (role: admin)...');
   let admin = await User.findOne({ email }).select('+password');
@@ -47,6 +48,10 @@ async function initializeDatabase(options = {}) {
     let changed = false;
     if (admin.role !== 'admin') {
       admin.role = 'admin';
+      changed = true;
+    }
+    if (admin.isActive === false) {
+      admin.isActive = true;
       changed = true;
     }
     if (options.resetAdminPassword) {
@@ -63,10 +68,12 @@ async function initializeDatabase(options = {}) {
     }
   } else {
     admin = await User.create({
+      studentId: process.env.ADMIN_STUDENT_ID || 'ADMIN001',
       fullName,
       email,
       password,
       role: 'admin',
+      isActive: true,
     });
     adminAction = 'created';
     log(`   ✓ สร้าง admin ใหม่: ${email}`);
@@ -74,26 +81,13 @@ async function initializeDatabase(options = {}) {
 
   const adminCount = await User.countDocuments({ role: 'admin' });
 
-  const meta = {
+  return {
     database: dbName,
     adminEmail: email,
     adminAction,
     adminCount,
     collections: COLLECTIONS.map((c) => c.name),
   };
-
-  if (!quiet) {
-    log('');
-    log('✅ ตั้งค่าฐานข้อมูลเสร็จสมบูรณ์');
-    log(`   Database: ${dbName}`);
-    log(`   Admin: ${email} (role: admin)`);
-    log(`   จำนวน admin ทั้งหมด: ${adminCount}`);
-    if (adminAction === 'created') {
-      log(`   รหัสผ่านเริ่มต้น: ${password} (เปลี่ยนใน .env หรือ PATCH /api/users หลัง login)`);
-    }
-  }
-
-  return meta;
 }
 
 module.exports = { initializeDatabase, COLLECTIONS };

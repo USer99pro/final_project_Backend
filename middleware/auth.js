@@ -1,10 +1,12 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { logAudit } = require('../utils/audit');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
 
 function signToken(user) {
-  return jwt.sign({ userId: user._id.toString(), role: user.role }, JWT_SECRET, {
+  const role = user.role === 'user' ? 'graduate' : user.role;
+  return jwt.sign({ userId: user._id.toString(), role }, JWT_SECRET, {
     expiresIn: '7d',
   });
 }
@@ -22,6 +24,9 @@ async function authenticate(req, res, next) {
     if (!user) {
       return res.status(401).json({ error: 'ผู้ใช้ไม่พบหรือถูกลบแล้ว' });
     }
+    if (!user.isActive) {
+      return res.status(403).json({ error: 'บัญชีถูกระงับการใช้งาน' });
+    }
     req.user = user;
     next();
   } catch {
@@ -36,6 +41,15 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+function requireGraduate(req, res, next) {
+  const role = req.user?.role;
+  if (role !== 'graduate' && role !== 'user') {
+    if (role === 'admin') return next();
+    return res.status(403).json({ error: 'ต้องเป็นบัญชีนักศึกษาจบการศึกษา' });
+  }
+  next();
+}
+
 function isOwnerOrAdmin(doc, user) {
   if (!doc || !user) return false;
   if (user.role === 'admin') return true;
@@ -46,4 +60,23 @@ function isOwnerOrAdmin(doc, user) {
   return ownerId === user._id.toString();
 }
 
-module.exports = { signToken, authenticate, requireAdmin, isOwnerOrAdmin, JWT_SECRET };
+async function recordLogin(user, req) {
+  await logAudit({
+    userId: user._id,
+    action: 'login',
+    targetType: 'user',
+    targetId: user._id,
+    metadata: { email: user.email, role: user.role },
+    req,
+  });
+}
+
+module.exports = {
+  signToken,
+  authenticate,
+  requireAdmin,
+  requireGraduate,
+  isOwnerOrAdmin,
+  recordLogin,
+  JWT_SECRET,
+};

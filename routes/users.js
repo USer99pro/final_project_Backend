@@ -7,7 +7,6 @@ const router = express.Router();
 
 router.use(authenticate);
 
-/** GET /api/users — admin: ทุกคน | user: ตัวเอง */
 router.get('/', async (req, res) => {
   try {
     if (req.user.role === 'admin') {
@@ -20,7 +19,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-/** GET /api/users/:id */
 router.get('/:id', async (req, res) => {
   try {
     const isSelf = req.params.id === req.user._id.toString();
@@ -35,33 +33,35 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-/** POST /api/users — admin เพิ่มผู้ใช้ */
 router.post('/', requireAdmin, async (req, res) => {
   try {
-    const { fullName, email, password, phone, role } = req.body;
+    const { studentId, fullName, email, password, major, phone, role } = req.body;
     if (!fullName || !email || !password) {
       return res.status(400).json({ error: 'fullName, email, password จำเป็น' });
     }
-    if (role && !['user', 'admin'].includes(role)) {
-      return res.status(400).json({ error: 'role ต้องเป็น user หรือ admin' });
+    const r = role || 'graduate';
+    if (!['graduate', 'admin'].includes(r)) {
+      return res.status(400).json({ error: 'role ต้องเป็น graduate หรือ admin' });
     }
 
     const user = await User.create({
+      studentId: studentId != null ? String(studentId).trim() : undefined,
       fullName: String(fullName).trim(),
       email: String(email).trim(),
       password: String(password),
+      major: major != null ? String(major).trim() : '',
       phone: phone != null ? String(phone).trim() : '',
-      role: role || 'user',
+      role: r,
+      isActive: true,
     });
 
     res.status(201).json(stripVersion(user.toPublicJSON()));
   } catch (err) {
-    if (err.code === 11000) return res.status(409).json({ error: 'อีเมลนี้มีอยู่แล้ว' });
+    if (err.code === 11000) return res.status(409).json({ error: 'อีเมลหรือรหัสนักศึกษาซ้ำ' });
     res.status(500).json({ error: err.message });
   }
 });
 
-/** PATCH /api/users/:id — แก้ไขตัวเอง หรือ admin แก้ทุกคน */
 router.patch('/:id', async (req, res) => {
   try {
     const isSelf = req.params.id === req.user._id.toString();
@@ -72,18 +72,22 @@ router.patch('/:id', async (req, res) => {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
 
-    const { fullName, email, phone, password, role } = req.body;
+    const { studentId, fullName, email, phone, password, major, role } = req.body;
+    if (studentId != null && (isSelf || req.user.role === 'admin')) {
+      user.studentId = String(studentId).trim();
+    }
     if (fullName != null) user.fullName = String(fullName).trim();
     if (email != null) user.email = String(email).trim();
     if (phone != null) user.phone = String(phone).trim();
+    if (major != null) user.major = String(major).trim();
     if (password != null && String(password).length >= 6) user.password = String(password);
 
     if (role != null) {
       if (req.user.role !== 'admin') {
         return res.status(403).json({ error: 'เปลี่ยน role ได้เฉพาะ admin' });
       }
-      if (!['user', 'admin'].includes(role)) {
-        return res.status(400).json({ error: 'role ต้องเป็น user หรือ admin' });
+      if (!['graduate', 'admin'].includes(role)) {
+        return res.status(400).json({ error: 'role ต้องเป็น graduate หรือ admin' });
       }
       user.role = role;
     }
@@ -91,12 +95,11 @@ router.patch('/:id', async (req, res) => {
     await user.save();
     res.json(stripVersion(user.toPublicJSON()));
   } catch (err) {
-    if (err.code === 11000) return res.status(409).json({ error: 'อีเมลนี้มีอยู่แล้ว' });
+    if (err.code === 11000) return res.status(409).json({ error: 'อีเมลหรือรหัสนักศึกษาซ้ำ' });
     res.status(500).json({ error: err.message });
   }
 });
 
-/** DELETE /api/users/:id — admin เท่านั้น */
 router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);

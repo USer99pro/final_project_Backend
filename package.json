@@ -3,6 +3,7 @@
     "start": "node server.js",
     "dev": "node server.js",
     "init:db": "node scripts/init-database.js",
+    "migrate:roles": "node scripts/migrate-roles.js",
     "seed:admin": "node scripts/init-database.js",
     "test:api": "node scripts/test-api.js"
   },
