@@ -15,6 +15,11 @@ router.post('/register', async (req, res) => {
         error: 'studentId, fullName, major, email, password จำเป็น',
       });
     }
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(String(email).trim())) {
+      return res.status(400).json({ error: 'อีเมลไม่ถูกต้อง' });
+    }
     if (password !== confirmPassword) {
       return res.status(400).json({ error: 'รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน' });
     }

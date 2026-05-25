@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const Content = require('../models/Content');
 const Tag = require('../models/Tag');
 const Category = require('../models/Category');
+const PdfFile = require('../models/PdfFile');
 const { authenticate, isOwnerOrAdmin } = require('../middleware/auth');
 const { uploadPdf, uploadDir } = require('../middleware/uploadPdf');
 const { stripVersion } = require('../utils/serialize');
@@ -35,15 +36,20 @@ async function validateRefs(categoryId, tagIds) {
   return null;
 }
 
-function removePdfFile(filename) {
+async function removePdfFile(filename) {
   if (!filename) return;
   const filePath = path.join(uploadDir, filename);
   if (fs.existsSync(filePath)) {
     try {
       fs.unlinkSync(filePath);
-    } catch (_) {
-      /* ignore */
+    } catch (err) {
+      console.error('[RemovePdfFile] Failed to delete file:', err.message);
     }
+  }
+  try {
+    await PdfFile.deleteOne({ filename });
+  } catch (err) {
+    console.error('[RemovePdfFile] Failed to delete DB record:', err.message);
   }
 }
 
@@ -135,7 +141,7 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
 
     const refErr = await validateRefs(categoryId, tagIds);
     if (refErr) {
-      if (uploadedPath) removePdfFile(req.file.filename);
+      if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
       return res.status(refErr.status).json({ error: refErr.error });
     }
 
@@ -155,6 +161,22 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
       isPublicDownload: true,
     });
 
+    if (req.file) {
+      const fileBuffer = fs.readFileSync(req.file.path);
+      await PdfFile.create({
+        filename: req.file.filename,
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        data: fileBuffer,
+      });
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+
     await item.save();
     await logActivity({
       contentId: item._id,
@@ -171,7 +193,7 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
 
     res.status(201).json(contentJson(populated, req));
   } catch (err) {
-    if (uploadedPath) removePdfFile(req.file?.filename);
+    if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
     res.status(500).json({ error: err.message });
   }
 });
@@ -213,7 +235,7 @@ router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
 
     const refErr = await validateRefs(categoryId, tagIds);
     if (refErr) {
-      if (uploadedPath) removePdfFile(req.file.filename);
+      if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
       return res.status(refErr.status).json({ error: refErr.error });
     }
 
@@ -221,7 +243,22 @@ router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
     item.tags = tagIds;
 
     if (req.file) {
-      removePdfFile(item.pdfFilename);
+      await removePdfFile(item.pdfFilename);
+
+      const fileBuffer = fs.readFileSync(req.file.path);
+      await PdfFile.create({
+        filename: req.file.filename,
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        data: fileBuffer,
+      });
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (_) {
+        /* ignore */
+      }
+
       item.pdfFilename = req.file.filename;
       item.pdfOriginalName = req.file.originalname;
     }
@@ -245,7 +282,7 @@ router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
 
     res.json(contentJson(populated, req));
   } catch (err) {
-    if (uploadedPath) removePdfFile(req.file.filename);
+    if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
     res.status(500).json({ error: err.message });
   }
 });
@@ -258,7 +295,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(403).json({ error: 'ลบได้เฉพาะผลงานของตัวเอง' });
     }
 
-    removePdfFile(item.pdfFilename);
+    await removePdfFile(item.pdfFilename);
     await logActivity({
       contentId: item._id,
       byUser: req.user._id,

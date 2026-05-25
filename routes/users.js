@@ -39,6 +39,11 @@ router.post('/', requireAdmin, async (req, res) => {
     if (!fullName || !email || !password) {
       return res.status(400).json({ error: 'fullName, email, password จำเป็น' });
     }
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(String(email).trim())) {
+      return res.status(400).json({ error: 'อีเมลไม่ถูกต้อง' });
+    }
     const r = role || 'graduate';
     if (!['graduate', 'admin'].includes(r)) {
       return res.status(400).json({ error: 'role ต้องเป็น graduate หรือ admin' });

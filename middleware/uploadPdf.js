@@ -2,7 +2,13 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 
-const uploadDir = process.env.VERCEL
+const isServerless =
+  process.env.VERCEL ||
+  process.env.LAMBDA_TASK_ROOT ||
+  __dirname.includes('/var/task') ||
+  __dirname.includes('\\var\\task');
+
+const uploadDir = isServerless
   ? path.join('/tmp', 'uploads', 'pdfs')
   : path.join(__dirname, '..', 'uploads', 'pdfs');
 

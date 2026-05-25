@@ -4,6 +4,7 @@ const express = require('express');
 const Content = require('../models/Content');
 const Category = require('../models/Category');
 const Tag = require('../models/Tag');
+const PdfFile = require('../models/PdfFile');
 const { uploadDir } = require('../middleware/uploadPdf');
 const { toPublicProject } = require('../utils/publicProject');
 const { buildResearchFilter } = require('../utils/searchFilter');
@@ -46,18 +47,38 @@ router.get('/projects/:id/file', async (req, res) => {
       return res.status(404).json({ error: 'ไม่มีไฟล์ PDF' });
     }
 
+    const disposition = req.query.download === '1' ? 'attachment' : 'inline';
+
+    // 1. Try to serve from MongoDB
+    const pdf = await PdfFile.findOne({ filename: item.pdfFilename });
+    if (pdf) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `${disposition}; filename="${encodeURIComponent(item.pdfOriginalName || item.pdfFilename)}"`
+      );
+      return res.send(pdf.data);
+    }
+
+    // 2. Fallback to local disk
     const filePath = path.join(uploadDir, item.pdfFilename);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'ไฟล์ไม่พบบนเซิร์ฟเวอร์' });
     }
 
-    const disposition = req.query.download === '1' ? 'attachment' : 'inline';
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
       `${disposition}; filename="${encodeURIComponent(item.pdfOriginalName || item.pdfFilename)}"`
     );
-    res.sendFile(path.resolve(filePath));
+    res.sendFile(path.resolve(filePath), (err) => {
+      if (err) {
+        console.error('[SendFile Error]', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Failed to serve file' });
+        }
+      }
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
