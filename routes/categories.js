@@ -21,14 +21,20 @@ router.use(authenticate, requireAdmin);
 router.post('/', async (req, res) => {
   try {
     const { name, description } = req.body;
-    if (!name) return res.status(400).json({ error: 'name จำเป็น' });
+
     const category = await Category.create({
       name: String(name).trim(),
-      description: description != null ? String(description).trim() : '',
+      description: description || '',
     });
-    res.status(201).json(stripVersion(category));
+
+    const categories = await Category.find().sort({ name: 1 });
+
+    res.status(201).json({
+      message: 'เพิ่มข้อมูลสำเร็จ',
+      data: stripVersion(category),
+      categories: categories.map(stripVersion),
+    });
   } catch (err) {
-    if (err.code === 11000) return res.status(409).json({ error: 'หมวดหมู่นี้มีอยู่แล้ว' });
     res.status(500).json({ error: err.message });
   }
 });
@@ -37,13 +43,29 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   try {
     const category = await Category.findById(req.params.id);
-    if (!category) return res.status(404).json({ error: 'ไม่พบหมวดหมู่' });
-    if (req.body.name != null) category.name = String(req.body.name).trim();
-    if (req.body.description != null) category.description = String(req.body.description).trim();
+
+    if (!category) {
+      return res.status(404).json({ error: 'ไม่พบหมวดหมู่' });
+    }
+
+    if (req.body.name != null) {
+      category.name = String(req.body.name).trim();
+    }
+
+    if (req.body.description != null) {
+      category.description = String(req.body.description).trim();
+    }
+
     await category.save();
-    res.json(stripVersion(category));
+
+    const categories = await Category.find().sort({ name: 1 });
+
+    res.json({
+      message: 'แก้ไขข้อมูลสำเร็จ',
+      data: stripVersion(category),
+      categories: categories.map(stripVersion),
+    });
   } catch (err) {
-    if (err.code === 11000) return res.status(409).json({ error: 'หมวดหมู่นี้มีอยู่แล้ว' });
     res.status(500).json({ error: err.message });
   }
 });
@@ -52,8 +74,17 @@ router.patch('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const category = await Category.findByIdAndDelete(req.params.id);
-    if (!category) return res.status(404).json({ error: 'ไม่พบหมวดหมู่' });
-    res.json({ message: 'ลบหมวดหมู่แล้ว', id: category._id });
+
+    if (!category) {
+      return res.status(404).json({ error: 'ไม่พบหมวดหมู่' });
+    }
+
+    const categories = await Category.find().sort({ name: 1 });
+
+    res.json({
+      message: 'ลบข้อมูลสำเร็จ',
+      categories: categories.map(stripVersion),
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
