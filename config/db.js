@@ -20,22 +20,33 @@ const dns = dnsNode.promises;
 const MONGO_URI = (process.env.MONGO_URI || process.env.MONGO_URI_NONSRV || '').trim();
 
 async function checkDNS(uri) {
+  console.log('[DNS] Starting DNS check...');
   if (!uri) throw new Error('MONGO_URI missing');
-  if (process.env.MONGO_SKIP_DNS_CHECK === '1') return;
+  if (process.env.MONGO_SKIP_DNS_CHECK === '1') {
+    console.log('[DNS] Skipped (MONGO_SKIP_DNS_CHECK=1)');
+    return;
+  }
 
   const match = uri.match(/@([^/?]+)/);
-  if (!match) return;
+  if (!match) {
+    console.log('[DNS] No host found in URI, skipping check');
+    return;
+  }
 
   const host = match[1].split(',')[0];
   const useSrv = uri.startsWith('mongodb+srv://');
+  console.log(`[DNS] Resolving host: ${host} (${useSrv ? 'SRV' : 'A/AAAA'})`);
 
   try {
     if (useSrv) {
-      await dns.resolveSrv(`_mongodb._tcp.${host}`);
+      const records = await dns.resolveSrv(`_mongodb._tcp.${host}`);
+      console.log(`[DNS] ✓ SRV resolved — ${records.length} record(s): ${records.map((r) => r.name).join(', ')}`);
     } else {
-      await dns.lookup(host);
+      const result = await dns.lookup(host);
+      console.log(`[DNS] ✓ Lookup resolved — ${result.address}`);
     }
   } catch (err) {
+    console.error(`[DNS] ✗ Failed — ${err.code || err.message}`);
     const isRefused = err.code === 'ECONNREFUSED';
     throw new Error(
       isRefused
@@ -55,9 +66,19 @@ function getMongoConnectOptions() {
 }
 
 async function connectDB() {
+  console.log('[MongoDB] Connecting...');
+  console.log(`[MongoDB] URI: ${MONGO_URI.replace(/\/\/([^:]+):([^@]+)@/, '//$1:****@')}`);
+
   await checkDNS(MONGO_URI);
-  await mongoose.connect(MONGO_URI, getMongoConnectOptions());
-  console.log(`[MongoDB] connected — database: "${mongoose.connection.name}" collection: "users"`);
+
+  const opts = getMongoConnectOptions();
+  console.log(`[MongoDB] Options: ${JSON.stringify(opts)}`);
+
+  await mongoose.connect(MONGO_URI, opts);
+
+  const { name, host, port } = mongoose.connection;
+  console.log(`[MongoDB] ✓ Connected — db: "${name}", host: ${host}, port: ${port}`);
+  console.log(`[MongoDB] Collections: ${Object.keys(mongoose.connection.collections).join(', ') || '(none loaded yet)'}`);
 }
 
 module.exports = { connectDB, mongoose, getMongoConnectOptions };
