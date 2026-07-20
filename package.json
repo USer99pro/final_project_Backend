@@ -7,7 +7,6 @@
     "seed:admin": "node scripts/init-database.js",
     "test:api": "node scripts/test-api.js",
     "default": "npm run dev"
-
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -15,7 +14,7 @@
     "dotenv": "^17.4.1",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.4.1",
+    "mongoose": "^9.8.0",
     "multer": "^1.4.5-lts.1"
   },
   "devDependencies": {
