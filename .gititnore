@@ -144,3 +144,7 @@ vite.config.ts.timestamp-*
 
 .cursor
 .cursor/*
+
+/node_modules
+node_modules
+node_modules/*
