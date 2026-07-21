@@ -20,7 +20,7 @@ const listPopulate = [
 /** GET /api/public/projects — สืบค้นผลงานเผยแพร่ (ไม่ต้อง login) */
 router.get('/projects', async (req, res) => {
   try {
-    const filter = buildResearchFilter(req.query, { publishedOnly: true });
+    const filter = await buildResearchFilter(req.query, { publishedOnly: true });
     const items = await Content.find(filter)
       .populate(listPopulate)
       .sort({ createdAt: -1 });
@@ -101,7 +101,7 @@ router.get('/projects/:id', async (req, res) => {
 /** GET /api/public/papers */
 router.get('/papers', async (req, res) => {
   try {
-    const filter = buildResearchFilter(req.query, { publishedOnly: true });
+    const filter = await buildResearchFilter(req.query, { publishedOnly: true });
     filter.pdfFilename = { $ne: '' };
     filter.isPublicDownload = true;
 
@@ -118,17 +118,21 @@ router.get('/papers', async (req, res) => {
   }
 });
 
-router.get('/categories', async (_req, res) => {
+router.get('/categories', async (req, res) => {
   try {
-    res.json(await Category.find().sort({ name: 1 }).lean());
+    const filter = req.query.department ? { departments: req.query.department } : {};
+    res.json(await Category.find(filter).populate('departments', 'name').sort({ name: 1 }).lean());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-router.get('/tags', async (_req, res) => {
+router.get('/tags', async (req, res) => {
   try {
-    res.json(await Tag.find().sort({ name: 1 }).lean());
+    const filter = {};
+    if (req.query.department) filter.department = req.query.department;
+    if (req.query.category) filter.category = req.query.category;
+    res.json(await Tag.find(filter).populate('department', 'name').populate('category', 'name').sort({ name: 1 }).lean());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

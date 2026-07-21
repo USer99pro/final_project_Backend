@@ -1,0 +1,16 @@
+module.exports = [
+  ['สาขาวิชาการบัญชี', ['การบัญชีการเงิน', 'การบัญชีต้นทุน', 'การบัญชีภาษีอากร', 'การสอบบัญชี', 'ระบบสารสนเทศทางการบัญชี', 'การวิเคราะห์งบการเงิน', 'การเงินและการลงทุน', 'การบริหารความเสี่ยงทางการเงิน']],
+  ['สาขาวิชาการตลาด', ['การตลาดดิจิทัล', 'พฤติกรรมผู้บริโภค', 'การสร้างแบรนด์', 'การสื่อสารการตลาด', 'E-Commerce', 'การตลาดออนไลน์', 'การวิจัยการตลาด', 'CRM']],
+  ['สาขาวิชาการจัดการธุรกิจค้าปลีก', ['การบริหารร้านค้าปลีก', 'การจัดการสินค้า', 'ระบบ POS', 'การบริการลูกค้า', 'E-Commerce', 'การบริหารสต็อกสินค้า', 'การจัดซื้อ', 'การวิเคราะห์ยอดขาย']],
+  ['สาขาวิชาการจัดการสำนักงานดิจิทัล', ['Digital Office', 'Smart Office', 'Workflow', 'e-Document', 'ระบบสารบรรณอิเล็กทรอนิกส์', 'การจัดการเอกสาร', 'ระบบสำนักงานอัตโนมัติ', 'การบริหารสำนักงาน']],
+  ['สาขาวิชาเทคโนโลยีธุรกิจดิจิทัล', ['Digital Business', 'Business Intelligence', 'ERP', 'CRM', 'Data Analytics', 'E-Commerce', 'Digital Transformation', 'FinTech']],
+  ['สาขาวิชาเทคโนโลยีสารสนเทศ', ['Artificial Intelligence', 'Machine Learning', 'Web Development', 'Mobile Application', 'Software Development', 'Database Systems', 'Information Systems', 'Cyber Security', 'Cloud Computing', 'Computer Networks', 'Internet of Things (IoT)', 'Data Science', 'Big Data', 'UX/UI Design', 'API Development']],
+  ['สาขาวิชาการจัดการโลจิสติกส์และซัพพลายเชน', ['Supply Chain', 'Logistics Management', 'Warehouse Management', 'Transportation', 'Inventory Management', 'Route Optimization', 'Smart Logistics', 'GPS Tracking']],
+  ['สาขาวิชาธุรกิจการบิน', ['Airport Management', 'Airline Business', 'Ground Service', 'Cabin Service', 'Passenger Service', 'Aviation Safety', 'Airport Technology', 'Customer Experience']],
+  ['สาขาวิชาดิจิทัลกราฟิก', ['Graphic Design', 'Motion Graphic', 'Animation', '3D Modeling', 'Branding', 'Multimedia', 'Video Production', 'UI Design', 'UX Design']],
+  ['สาขาวิชาเทคโนโลยีแฟชั่นและเครื่องแต่งกาย', ['Fashion Design', 'Garment Design', 'Pattern Design', 'Textile Technology', 'Garment Production', 'Fashion Marketing', 'Smart Textile', 'Sustainable Fashion']],
+  ['สาขาวิชาอาหารและโภชนาการ', ['Food Innovation', 'Food Processing', 'Food Safety', 'Nutrition', 'Healthy Food', 'Food Packaging', 'Local Food', 'Product Development']],
+  ['สาขาวิชาการบริหารงานคหกรรมศาสตร์', ['Home Economics', 'Home Management', 'Community Products', 'Handicraft', 'Service Management', 'Catering', 'Product Design', 'Entrepreneurship']],
+  ['สาขาวิชาการโรงแรม', ['Hotel Management', 'Front Office', 'Housekeeping', 'Food and Beverage', 'Hospitality Technology', 'Customer Satisfaction', 'Hotel Marketing', 'Smart Hotel']],
+  ['สาขาวิชาการท่องเที่ยว', ['Cultural Tourism', 'Eco Tourism', 'Smart Tourism', 'Digital Tourism', 'Tourism Marketing', 'Tour Guide', 'Destination Management', 'Sustainable Tourism']],
+].map(([department, categories]) => ({ department, categories, isActive: true }));

@@ -159,7 +159,7 @@ router.post('/users/:id/reset-password', async (req, res) => {
 /** GET /api/admin/works */
 router.get('/works', async (req, res) => {
   try {
-    const filter = buildResearchFilter(req.query, { publishedOnly: false });
+    const filter = await buildResearchFilter(req.query, { publishedOnly: false });
     const items = await Content.find(filter)
       .populate('author', 'fullName email studentId major')
       .populate('category', 'name')

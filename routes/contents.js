@@ -24,14 +24,58 @@ function parseIdList(value) {
     .filter(Boolean);
 }
 
+function normalizeKeywords(value) {
+  return [...new Set(
+    parseIdList(value)
+      .map((keyword) => keyword.replace(/\s+/g, ' ').trim())
+      .filter((keyword) => keyword && keyword.length <= 60)
+  )].slice(0, 20);
+}
+
+async function resolveTagIds(tagValue, keywordValue, userId) {
+  const values = parseIdList(tagValue);
+  const tagIds = values.filter((id) => mongoose.Types.ObjectId.isValid(id));
+  const keywords = normalizeKeywords([
+    ...values.filter((value) => !mongoose.Types.ObjectId.isValid(value)),
+    ...parseIdList(keywordValue),
+  ]);
+
+  for (const name of keywords) {
+    let tag = await Tag.findOne({ name, department: null, category: null });
+    if (!tag) {
+      try {
+        tag = await Tag.create({ name, createdBy: userId });
+      } catch (err) {
+        if (err.code !== 11000) throw err;
+        tag = await Tag.findOne({ name, department: null, category: null });
+      }
+    }
+    if (tag) tagIds.push(String(tag._id));
+  }
+  return [...new Set(tagIds)];
+}
+
 async function validateRefs(categoryId, tagIds) {
+  let category = null;
   if (categoryId) {
-    const cat = await Category.findById(categoryId);
-    if (!cat) return { error: 'ไม่พบหมวดหมู่', status: 400 };
+    category = await Category.findById(categoryId);
+    if (!category) return { error: 'ไม่พบหมวดหมู่', status: 400 };
   }
   if (tagIds.length) {
-    const count = await Tag.countDocuments({ _id: { $in: tagIds } });
-    if (count !== tagIds.length) return { error: 'มี tag id ที่ไม่ถูกต้อง', status: 400 };
+    const tags = await Tag.find({ _id: { $in: tagIds } });
+    if (tags.length !== tagIds.length) return { error: 'มี tag id ที่ไม่ถูกต้อง', status: 400 };
+
+    if (category) {
+      const invalidTag = tags.find((tag) => {
+        const categoryMismatch = tag.category && String(tag.category) !== String(category._id);
+        const departmentMismatch =
+          tag.department && !(category.departments || []).some((id) => String(id) === String(tag.department));
+        return categoryMismatch || departmentMismatch;
+      });
+      if (invalidTag) {
+        return { error: 'แท็กต้องอยู่ในประเภทและแผนกเดียวกับผลงาน', status: 400 };
+      }
+    }
   }
   return null;
 }
@@ -92,7 +136,7 @@ router.get('/', async (req, res) => {
   try {
     const filter =
       req.user.role === 'admin'
-        ? buildResearchFilter(req.query, { publishedOnly: false })
+        ? await buildResearchFilter(req.query, { publishedOnly: false })
         : { author: req.user._id };
 
     if (req.user.role !== 'admin') {
@@ -131,11 +175,11 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
   const uploadedPath = req.file?.path;
 
   try {
-    const { title, description, abstract, category, tags, academicYear, major, studentName, status } =
+    const { title, description, abstract, category, tags, keywords, keyword, academicYear, major, studentName, status } =
       req.body;
     if (!title) return res.status(400).json({ error: 'title จำเป็น' });
 
-    const tagIds = parseIdList(tags).filter((id) => mongoose.Types.ObjectId.isValid(id));
+    const tagIds = await resolveTagIds(tags, keywords ?? keyword, req.user._id);
     const categoryId =
       category && mongoose.Types.ObjectId.isValid(category) ? category : null;
 
@@ -215,7 +259,7 @@ router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
     const prevStatus = item.status;
     const isAdmin = req.user.role === 'admin';
 
-    const { category, tags } = req.body;
+    const { category, tags, keywords, keyword } = req.body;
     const fieldErr = applyContentFields(item, req.body, req.user, isAdmin);
     if (fieldErr) {
       if (uploadedPath) removePdfFile(req.file.filename);
@@ -229,8 +273,8 @@ router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
     }
 
     let tagIds = item.tags.map((t) => t.toString());
-    if (tags !== undefined) {
-      tagIds = parseIdList(tags).filter((id) => mongoose.Types.ObjectId.isValid(id));
+    if (tags !== undefined || keywords !== undefined || keyword !== undefined) {
+      tagIds = await resolveTagIds(tags, keywords ?? keyword, req.user._id);
     }
 
     const refErr = await validateRefs(categoryId, tagIds);

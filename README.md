@@ -25,10 +25,12 @@ npm start
 
 ### สาธารณะ (ไม่ต้อง login)
 
-- `GET /api/public/projects?q=&title=&studentName=&major=&academicYear=`
+- `GET /api/public/projects?q=` — ค้นหาชื่อผลงาน, ชื่อผู้วิจัย, ประเภท และ keyword
+- ตัวกรองเฉพาะ: `title`, `researcher` (หรือ `studentName`), `categoryName`, `keyword`, `major`, `academicYear`
 - `GET /api/public/projects/:id`
 - `GET /api/public/projects/:id/file?download=1`
-- `GET /api/public/categories` | `/api/public/tags`
+- `GET /api/public/categories?department=:departmentId` | `/api/public/tags?department=:departmentId&category=:categoryId`
+- `GET /api/departments` — แผนกพร้อมประเภทและแท็กที่เชื่อมโยงกัน
 
 ### Auth
 
@@ -41,6 +43,7 @@ npm start
 - `GET /api/me/works` | `GET /api/me/activity`
 - `GET/POST/PATCH/DELETE /api/contents`
 - `PATCH /api/users/:id` (โปรไฟล์ตัวเอง)
+- ส่ง `keyword` หรือ `keywords` (ข้อความคั่นด้วย comma หรือ array) พร้อม `POST/PATCH /api/contents` เพื่อให้ระบบสร้าง keyword ของผู้ใช้ให้อัตโนมัติ
 
 ### Admin
 
