@@ -13,6 +13,7 @@ const router = express.Router();
 
 const listPopulate = [
   { path: 'author', select: 'fullName' },
+  { path: 'participants', select: 'fullName email studentId major' },
   { path: 'category', select: 'name description' },
   { path: 'tags', select: 'name' },
 ];

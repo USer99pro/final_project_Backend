@@ -18,6 +18,7 @@ function toPublicProject(doc, req) {
     category: o.category,
     tags: o.tags,
     author,
+    participants: o.participants || [],
     status: o.status,
     hasPdf: o.hasPdf,
     pdfFilename: o.pdfFilename || '',
