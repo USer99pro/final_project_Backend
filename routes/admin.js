@@ -67,6 +67,45 @@ router.get('/dashboard', async (_req, res) => {
   }
 });
 
+/** GET /api/admin/users */
+router.get('/users', async (req, res) => {
+  try {
+    const filter = {};
+    if (req.query.role) filter.role = req.query.role;
+    if (req.query.isActive) filter.isActive = req.query.isActive === 'true';
+    if (req.query.search) {
+      filter.$or = [
+        { fullName: new RegExp(req.query.search, 'i') },
+        { email: new RegExp(req.query.search, 'i') },
+        { studentId: new RegExp(req.query.search, 'i') },
+      ];
+    }
+    
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await Promise.all([
+      User.find(filter)
+        .select('-password')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      User.countDocuments(filter)
+    ]);
+
+    res.json({
+      users: users.map(u => stripVersion(u.toPublicJSON())),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** PATCH /api/admin/users/:id/suspend */
 router.patch('/users/:id/suspend', async (req, res) => {
   try {
@@ -162,6 +201,7 @@ router.get('/works', async (req, res) => {
     const filter = await buildResearchFilter(req.query, { publishedOnly: false });
     const items = await Content.find(filter)
       .populate('author', 'fullName email studentId major')
+      .populate('participants', 'fullName email studentId major')
       .populate('category', 'name')
       .populate('tags', 'name')
       .sort({ createdAt: -1 });

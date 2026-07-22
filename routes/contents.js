@@ -102,7 +102,7 @@ function contentJson(doc, req) {
 }
 
 function applyContentFields(item, body, user, isAdmin) {
-  const { title, description, abstract, category, tags, academicYear, major, studentName, status, isPublicDownload } =
+  const { title, description, abstract, category, tags, academicYear, major, studentName, status, isPublicDownload, participants } =
     body;
 
   if (title != null) item.title = String(title).trim();
@@ -125,6 +125,14 @@ function applyContentFields(item, body, user, isAdmin) {
 
   if (isPublicDownload != null) {
     item.isPublicDownload = isPublicDownload === true || isPublicDownload === 'true';
+  }
+
+  if (participants != null) {
+    if (Array.isArray(participants)) {
+      item.participants = participants;
+    } else {
+      return { error: 'participants ต้องเป็น array' };
+    }
   }
 
   return null;
@@ -175,7 +183,7 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
   const uploadedPath = req.file?.path;
 
   try {
-    const { title, description, abstract, category, tags, keywords, keyword, academicYear, major, studentName, status } =
+    const { title, description, abstract, category, tags, keywords, keyword, academicYear, major, studentName, status, participants } =
       req.body;
     if (!title) return res.status(400).json({ error: 'title จำเป็น' });
 
@@ -197,6 +205,7 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
       major: major != null ? String(major).trim() : req.user.major || '',
       academicYear: academicYear != null ? String(academicYear).trim() : '',
       author: req.user._id,
+      participants: Array.isArray(participants) ? participants : [],
       category: categoryId,
       tags: tagIds,
       pdfFilename: req.file?.filename || '',

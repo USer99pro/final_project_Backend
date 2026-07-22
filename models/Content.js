@@ -9,6 +9,7 @@ const contentSchema = new mongoose.Schema(
     major: { type: String, trim: true, default: '' },
     academicYear: { type: String, trim: true, default: '' },
     author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
     tags: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Tag' }],
     pdfFilename: { type: String, default: '' },
