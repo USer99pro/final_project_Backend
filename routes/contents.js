@@ -3,6 +3,7 @@ const path = require('path');
 const express = require('express');
 const mongoose = require('mongoose');
 const Content = require('../models/Content');
+const User = require('../models/User');
 const Tag = require('../models/Tag');
 const Category = require('../models/Category');
 const PdfFile = require('../models/PdfFile');
@@ -30,6 +31,35 @@ function normalizeKeywords(value) {
       .map((keyword) => keyword.replace(/\s+/g, ' ').trim())
       .filter((keyword) => keyword && keyword.length <= 60)
   )].slice(0, 20);
+}
+
+function isObjectId(value) {
+  return mongoose.Types.ObjectId.isValid(value) && String(new mongoose.Types.ObjectId(value)) === String(value);
+}
+
+function parseParticipantIds(value) {
+  if (value == null || value === '') return [];
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value === 'string') return parseIdList(value);
+  return null;
+}
+
+async function validateParticipantIds(value) {
+  const ids = parseParticipantIds(value);
+  if (ids == null) return { error: 'participants ต้องเป็น array หรือรายการ id' };
+  if (!ids.length) return { ids: [] };
+
+  const invalid = ids.filter((id) => !isObjectId(id));
+  if (invalid.length) {
+    return { error: `participants มี id ไม่ถูกต้อง: ${invalid.join(', ')}` };
+  }
+
+  const uniqueIds = [...new Set(ids)];
+  const count = await User.countDocuments({ _id: { $in: uniqueIds } });
+  if (count !== uniqueIds.length) {
+    return { error: 'มี participants ที่ไม่พบในระบบ' };
+  }
+  return { ids: uniqueIds };
 }
 
 async function resolveTagIds(tagValue, keywordValue, userId) {
@@ -102,7 +132,7 @@ function contentJson(doc, req) {
 }
 
 function applyContentFields(item, body, user, isAdmin) {
-  const { title, description, abstract, category, tags, academicYear, major, studentName, status, isPublicDownload, participants } =
+  const { title, description, abstract, category, tags, academicYear, major, studentName, status, isPublicDownload } =
     body;
 
   if (title != null) item.title = String(title).trim();
@@ -127,14 +157,6 @@ function applyContentFields(item, body, user, isAdmin) {
     item.isPublicDownload = isPublicDownload === true || isPublicDownload === 'true';
   }
 
-  if (participants != null) {
-    if (Array.isArray(participants)) {
-      item.participants = participants;
-    } else {
-      return { error: 'participants ต้องเป็น array' };
-    }
-  }
-
   return null;
 }
 
@@ -153,6 +175,7 @@ router.get('/', async (req, res) => {
 
     const items = await Content.find(filter)
       .populate('author', 'fullName email studentId major')
+      .populate('participants', 'fullName email studentId major')
       .populate('category', 'name')
       .populate('tags', 'name')
       .sort({ createdAt: -1 });
@@ -167,6 +190,7 @@ router.get('/:id', async (req, res) => {
   try {
     const item = await Content.findById(req.params.id)
       .populate('author', 'fullName email studentId major')
+      .populate('participants', 'fullName email studentId major')
       .populate('category', 'name description')
       .populate('tags', 'name');
     if (!item) return res.status(404).json({ error: 'ไม่พบเนื้อหา' });
@@ -197,6 +221,12 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
       return res.status(refErr.status).json({ error: refErr.error });
     }
 
+    const participantResult = await validateParticipantIds(participants);
+    if (participantResult.error) {
+      if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
+      return res.status(400).json({ error: participantResult.error });
+    }
+
     const item = new Content({
       title: String(title).trim(),
       description: description != null ? String(description).trim() : '',
@@ -205,7 +235,7 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
       major: major != null ? String(major).trim() : req.user.major || '',
       academicYear: academicYear != null ? String(academicYear).trim() : '',
       author: req.user._id,
-      participants: Array.isArray(participants) ? participants : [],
+      participants: participantResult.ids,
       category: categoryId,
       tags: tagIds,
       pdfFilename: req.file?.filename || '',
@@ -241,6 +271,7 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
 
     const populated = await Content.findById(item._id)
       .populate('author', 'fullName email studentId major')
+      .populate('participants', 'fullName email studentId major')
       .populate('category', 'name')
       .populate('tags', 'name');
 
@@ -268,11 +299,20 @@ router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
     const prevStatus = item.status;
     const isAdmin = req.user.role === 'admin';
 
-    const { category, tags, keywords, keyword } = req.body;
+    const { category, tags, keywords, keyword, participants } = req.body;
     const fieldErr = applyContentFields(item, req.body, req.user, isAdmin);
     if (fieldErr) {
       if (uploadedPath) removePdfFile(req.file.filename);
       return res.status(400).json(fieldErr);
+    }
+
+    if (participants !== undefined) {
+      const participantResult = await validateParticipantIds(participants);
+      if (participantResult.error) {
+        if (uploadedPath) removePdfFile(req.file.filename);
+        return res.status(400).json({ error: participantResult.error });
+      }
+      item.participants = participantResult.ids;
     }
 
     let categoryId = item.category;
@@ -330,6 +370,7 @@ router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
 
     const populated = await Content.findById(item._id)
       .populate('author', 'fullName email studentId major')
+      .populate('participants', 'fullName email studentId major')
       .populate('category', 'name')
       .populate('tags', 'name');
 
