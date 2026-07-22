@@ -9,11 +9,9 @@ router.use(authenticate);
 
 router.get('/', async (req, res) => {
   try {
-    if (req.user.role === 'admin') {
-      const users = await User.find().sort({ createdAt: -1 });
-      return res.json(users.map((u) => stripVersion(u.toPublicJSON())));
-    }
-    res.json([stripVersion(req.user.toPublicJSON())]);
+    const filter = req.user.role === 'admin' ? {} : { isActive: true };
+    const users = await User.find(filter).select('-password').sort({ createdAt: -1 });
+    return res.json(users.map((u) => stripVersion(u.toPublicJSON())));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
