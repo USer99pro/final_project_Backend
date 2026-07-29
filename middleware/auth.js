@@ -7,7 +7,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
 function signToken(user) {
   const role = user.role === 'user' ? 'graduate' : user.role;
   return jwt.sign({ userId: user._id.toString(), role }, JWT_SECRET, {
-    expiresIn: '7d',
+    expiresIn: '30d',
   });
 }
 

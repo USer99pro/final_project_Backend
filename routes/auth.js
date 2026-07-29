@@ -1,9 +1,12 @@
 const express = require('express');
+const passport = require('../middleware/passport');
 const User = require('../models/User');
 const { signToken, authenticate, recordLogin } = require('../middleware/auth');
 const { stripVersion } = require('../utils/serialize');
 
 const router = express.Router();
+
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 /** POST /api/auth/register — นักศึกษาจบการศึกษาสมัครสมาชิก */
 router.post('/register', async (req, res) => {
@@ -83,5 +86,39 @@ router.post('/login', async (req, res) => {
 router.get('/me', authenticate, (req, res) => {
   res.json(stripVersion(req.user.toPublicJSON()));
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Google OAuth 2.0
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/auth/google
+ * Redirects the browser to the Google consent screen.
+ */
+router.get(
+  '/google',
+  passport.authenticate('google', { scope: ['profile', 'email'], session: true })
+);
+
+/**
+ * GET /api/auth/google/callback
+ * Google redirects here after the user grants/denies consent.
+ * On success  → redirect to frontend with ?token=<jwt>
+ * On failure  → redirect to frontend with ?error=<reason>
+ */
+router.get(
+  '/google/callback',
+  passport.authenticate('google', { session: true, failWithError: true }),
+  // Success handler
+  (req, res) => {
+    const { token } = req.user; // set by passport strategy
+    return res.redirect(`${FRONTEND_URL}/auth/callback?token=${encodeURIComponent(token)}`);
+  },
+  // Error handler (failWithError: true sends errors here)
+  (err, req, res, _next) => {
+    const reason = err?.message || 'oauth_error';
+    return res.redirect(`${FRONTEND_URL}/auth/callback?error=${encodeURIComponent(reason)}`);
+  }
+);
 
 module.exports = router;

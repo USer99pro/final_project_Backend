@@ -1,7 +1,10 @@
+require('dotenv').config();
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
+const session = require('express-session');
+const passport = require('./middleware/passport');
 const { connectDB } = require('./config/db');
 const authRouter = require('./routes/auth');
 const usersRouter = require('./routes/users');
@@ -21,6 +24,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// ── Session (required by Passport for OAuth state parameter) ─────────────────
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'change-this-session-secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 10 * 60 * 1000 }, // 10 min — only for OAuth handshake
+  })
+);
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
@@ -49,14 +64,11 @@ app.use((err, _req, res, _next) => {
 connectDB()
   .then(() => {
     const server = app.listen(PORT, () => {
-      console.log(`API http://localhost:${PORT}`);
-      console.log('  GET  /api/public/projects   (สืบค้า — ไม่ต้อง login)');
-      console.log('  POST /api/auth/register     (นักศึกษาจบสมัครสมาชิก)');
-      console.log('  POST /api/auth/login');
-      console.log('  GET  /api/me/works | /api/me/activity');
-      console.log('  GET  /api/admin/dashboard');
-      console.log('  Setup: npm run init:db');
+      console.log(`✅ API ready → http://localhost:${PORT}`);
+      console.log(`   JWT expiry    : 30 days`);
+      console.log(`   Google OAuth  : ${process.env.GOOGLE_CLIENT_ID ? 'configured ✓' : '⚠ GOOGLE_CLIENT_ID not set'}`);
     });
+
     server.on('error', (err) => {
       if (err.code === 'EADDRINUSE') {
         console.error(`\n❌ พอร์ต ${PORT} ถูกใช้งานอยู่แล้ว`);
