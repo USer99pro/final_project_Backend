@@ -211,6 +211,7 @@ router.get('/works', async (req, res) => {
     const items = await Content.find(filter)
       .populate('author', 'fullName email studentId major')
       .populate('participants', 'fullName email studentId major')
+      .populate('advisor advisors', 'prefix fullName academicPosition email departmentName')
       .populate('category', 'name')
       .populate('tags', 'name')
       .sort({ createdAt: -1 });

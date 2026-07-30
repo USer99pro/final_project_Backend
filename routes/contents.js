@@ -4,6 +4,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const Content = require('../models/Content');
 const User = require('../models/User');
+const Advisor = require('../models/Advisor');
 const Tag = require('../models/Tag');
 const Category = require('../models/Category');
 const PdfFile = require('../models/PdfFile');
@@ -44,7 +45,7 @@ function parseParticipantIds(value) {
   return null;
 }
 
-async function validateParticipantIds(value) {
+async function validateParticipantIds(value, major) {
   const ids = parseParticipantIds(value);
   if (ids == null) return { error: 'participants ต้องเป็น array หรือรายการ id' };
   if (!ids.length) return { ids: [] };
@@ -55,10 +56,28 @@ async function validateParticipantIds(value) {
   }
 
   const uniqueIds = [...new Set(ids)];
-  const count = await User.countDocuments({ _id: { $in: uniqueIds } });
+  const count = await User.countDocuments({ _id: { $in: uniqueIds }, isActive: true, major: String(major || '').trim() });
   if (count !== uniqueIds.length) {
     return { error: 'มี participants ที่ไม่พบในระบบ' };
   }
+  return { ids: uniqueIds };
+}
+
+async function validateAdvisorIds(value, major) {
+  const ids = parseParticipantIds(value);
+  if (ids == null) return { error: 'advisors must be a list of ids' };
+  const uniqueIds = [...new Set(ids)];
+  if (uniqueIds.length > 5) return { error: 'A project can have at most 5 advisors' };
+  if (!uniqueIds.length) return { ids: [] };
+  if (uniqueIds.some((id) => !isObjectId(id))) return { error: 'Invalid advisor id' };
+  const advisors = await Advisor.find({ _id: { $in: uniqueIds }, isActive: true }).populate('department', 'name');
+  if (advisors.length !== uniqueIds.length) return { error: 'Selected advisor was not found or is inactive' };
+  const normalizedMajor = String(major || '').trim().toLocaleLowerCase();
+  const outsideDepartment = advisors.some((advisor) => {
+    const advisorDepartment = String(advisor.department?.name || advisor.departmentName || '').trim().toLocaleLowerCase();
+    return !normalizedMajor || advisorDepartment !== normalizedMajor;
+  });
+  if (outsideDepartment) return { error: 'Advisors must belong to the project department' };
   return { ids: uniqueIds };
 }
 
@@ -132,7 +151,7 @@ function contentJson(doc, req) {
 }
 
 function applyContentFields(item, body, user, isAdmin) {
-  const { title, description, abstract, category, tags, advisor, academicYear, major, studentName, status, isPublicDownload } =
+  const { title, description, abstract, category, tags, academicYear, major, studentName, status, isPublicDownload } =
     body;
 
   if (title != null) item.title = String(title).trim();
@@ -142,10 +161,6 @@ function applyContentFields(item, body, user, isAdmin) {
   if (studentName != null) item.studentName = String(studentName).trim();
   if (major != null) item.major = String(major).trim();
   else if (!item.major && user.major) item.major = user.major;
-
-  if (advisor !== undefined) {
-    item.advisor = advisor && mongoose.Types.ObjectId.isValid(advisor) ? advisor : null;
-  }
 
   if (status != null) {
     if (!['draft', 'published'].includes(status)) {
@@ -180,7 +195,7 @@ router.get('/', async (req, res) => {
     const items = await Content.find(filter)
       .populate('author', 'fullName email studentId major')
       .populate('participants', 'fullName email studentId major')
-      .populate('advisor', 'prefix fullName academicPosition email departmentName')
+      .populate('advisor advisors', 'prefix fullName academicPosition email departmentName')
       .populate('category', 'name')
       .populate('tags', 'name')
       .sort({ createdAt: -1 });
@@ -196,7 +211,7 @@ router.get('/:id', async (req, res) => {
     const item = await Content.findById(req.params.id)
       .populate('author', 'fullName email studentId major')
       .populate('participants', 'fullName email studentId major')
-      .populate('advisor', 'prefix fullName academicPosition email departmentName')
+      .populate('advisor advisors', 'prefix fullName academicPosition email departmentName')
       .populate('category', 'name description')
       .populate('tags', 'name');
     if (!item) return res.status(404).json({ error: 'ไม่พบเนื้อหา' });
@@ -213,7 +228,7 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
   const uploadedPath = req.file?.path;
 
   try {
-    const { title, description, abstract, category, tags, keywords, keyword, academicYear, major, studentName, status, participants, advisor } =
+    const { title, description, abstract, category, tags, keywords, keyword, academicYear, major, studentName, status, participants, advisors, advisor } =
       req.body;
     if (!title) return res.status(400).json({ error: 'title จำเป็น' });
 
@@ -227,10 +242,20 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
       return res.status(refErr.status).json({ error: refErr.error });
     }
 
-    const participantResult = await validateParticipantIds(participants);
+    const projectMajor = major != null ? String(major).trim() : String(req.user.major || '').trim();
+    if (projectMajor !== String(req.user.major || '').trim()) {
+      if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
+      return res.status(400).json({ error: 'Project department cannot differ from your department' });
+    }
+    const participantResult = await validateParticipantIds(participants, projectMajor);
     if (participantResult.error) {
       if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
       return res.status(400).json({ error: participantResult.error });
+    }
+    const advisorResult = await validateAdvisorIds(advisors !== undefined ? advisors : advisor, projectMajor);
+    if (advisorResult.error) {
+      if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
+      return res.status(400).json({ error: advisorResult.error });
     }
 
     const item = new Content({
@@ -242,7 +267,8 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
       academicYear: academicYear != null ? String(academicYear).trim() : '',
       author: req.user._id,
       participants: participantResult.ids,
-      advisor: advisor && mongoose.Types.ObjectId.isValid(advisor) ? advisor : null,
+      advisor: advisorResult.ids[0] || null,
+      advisors: advisorResult.ids,
       category: categoryId,
       tags: tagIds,
       pdfFilename: req.file?.filename || '',
@@ -279,6 +305,7 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
     const populated = await Content.findById(item._id)
       .populate('author', 'fullName email studentId major')
       .populate('participants', 'fullName email studentId major')
+      .populate('advisor advisors', 'prefix fullName academicPosition email departmentName')
       .populate('category', 'name')
       .populate('tags', 'name');
 
@@ -306,7 +333,12 @@ router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
     const prevStatus = item.status;
     const isAdmin = req.user.role === 'admin';
 
-    const { category, tags, keywords, keyword, participants } = req.body;
+    const { category, tags, keywords, keyword, participants, advisors, advisor } = req.body;
+    const author = await User.findById(item.author).select('major');
+    if (req.body.major != null && String(req.body.major).trim() !== String(author?.major || '').trim()) {
+      if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
+      return res.status(400).json({ error: 'Project department cannot differ from the author department' });
+    }
     const fieldErr = applyContentFields(item, req.body, req.user, isAdmin);
     if (fieldErr) {
       if (uploadedPath) removePdfFile(req.file.filename);
@@ -314,12 +346,21 @@ router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
     }
 
     if (participants !== undefined) {
-      const participantResult = await validateParticipantIds(participants);
+      const participantResult = await validateParticipantIds(participants, author?.major);
       if (participantResult.error) {
         if (uploadedPath) removePdfFile(req.file.filename);
         return res.status(400).json({ error: participantResult.error });
       }
       item.participants = participantResult.ids;
+    }
+    if (advisors !== undefined || advisor !== undefined) {
+      const advisorResult = await validateAdvisorIds(advisors !== undefined ? advisors : advisor, author?.major);
+      if (advisorResult.error) {
+        if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
+        return res.status(400).json({ error: advisorResult.error });
+      }
+      item.advisors = advisorResult.ids;
+      item.advisor = advisorResult.ids[0] || null;
     }
 
     let categoryId = item.category;
@@ -378,6 +419,7 @@ router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
     const populated = await Content.findById(item._id)
       .populate('author', 'fullName email studentId major')
       .populate('participants', 'fullName email studentId major')
+      .populate('advisor advisors', 'prefix fullName academicPosition email departmentName')
       .populate('category', 'name')
       .populate('tags', 'name');
 

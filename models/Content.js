@@ -10,7 +10,9 @@ const contentSchema = new mongoose.Schema(
     academicYear: { type: String, trim: true, default: '' },
     author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    // `advisor` remains for backward compatibility with existing projects.
     advisor: { type: mongoose.Schema.Types.ObjectId, ref: 'Advisor', default: null },
+    advisors: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Advisor' }],
     category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
     tags: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Tag' }],
     pdfFilename: { type: String, default: '' },

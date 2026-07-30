@@ -17,6 +17,7 @@ const listPopulate = [
   { path: 'author', select: 'fullName' },
   { path: 'participants', select: 'fullName email studentId major' },
   { path: 'advisor', select: 'prefix fullName academicPosition email departmentName' },
+  { path: 'advisors', select: 'prefix fullName academicPosition email departmentName' },
   { path: 'category', select: 'name description' },
   { path: 'tags', select: 'name' },
 ];
