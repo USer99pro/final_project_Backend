@@ -73,6 +73,7 @@ router.get('/users', async (req, res) => {
     const filter = {};
     if (req.query.role) filter.role = req.query.role;
     if (req.query.isActive) filter.isActive = req.query.isActive === 'true';
+    if (req.query.major) filter.major = String(req.query.major).trim();
     if (req.query.search) {
       filter.$or = [
         { fullName: new RegExp(req.query.search, 'i') },

@@ -30,7 +30,7 @@ function pdfOnly(_req, file, cb) {
   const mime = (file.mimetype || '').toLowerCase();
   const mimeOk = mime === 'application/pdf' || mime === 'application/x-pdf';
   if (ext === '.pdf' && mimeOk) return cb(null, true);
-  cb(new Error('Only PDF files are allowed (application/pdf, .pdf)'));
+  cb(new Error('กรุณาอัปโหลดไฟล์ PDF เท่านั้น'));
 }
 
 const uploadPdf = multer({

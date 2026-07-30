@@ -14,9 +14,9 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const filter = {};
-    if (req.query.isActive !== undefined) {
+    if (req.query.isActive === 'true' || req.query.isActive === 'false') {
       filter.isActive = req.query.isActive === 'true';
-    } else {
+    } else if (req.query.isActive !== 'all') {
       filter.isActive = true; // default list active advisors
     }
 

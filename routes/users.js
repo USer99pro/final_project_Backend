@@ -9,8 +9,19 @@ router.use(authenticate);
 
 router.get('/', async (req, res) => {
   try {
-    const filter = req.user.role === 'admin' ? {} : { isActive: true };
-    const users = await User.find(filter).select('-password').sort({ createdAt: -1 });
+    const filter = req.user.role === 'admin' ? {} : { isActive: true, role: { $in: ['graduate', 'user'] } };
+
+    if (req.user.role === 'admin') {
+      if (req.query.major) filter.major = String(req.query.major).trim();
+      if (req.query.isActive === 'true' || req.query.isActive === 'false') {
+        filter.isActive = req.query.isActive === 'true';
+      }
+    } else {
+      // บัณฑิตเห็นเฉพาะผู้ใช้ในแผนกตัวเอง (สำหรับเลือกผู้ร่วมจัดทำ)
+      filter.major = String(req.user.major || '').trim();
+    }
+
+    const users = await User.find(filter).select('-password').sort({ fullName: 1, createdAt: -1 });
     return res.json(users.map((u) => stripVersion(u.toPublicJSON())));
   } catch (err) {
     res.status(500).json({ error: err.message });

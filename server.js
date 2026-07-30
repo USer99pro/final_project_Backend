@@ -53,7 +53,14 @@ app.use('/api/me', meRouter);
 app.use('/api/admin', adminRouter);
 
 app.use((err, _req, res, next) => {
-  if (err instanceof multer.MulterError || /PDF|multipart/i.test(err.message || '')) {
+  if (err instanceof multer.MulterError) {
+    const message =
+      err.code === 'LIMIT_FILE_SIZE'
+        ? 'ไฟล์ PDF มีขนาดใหญ่เกินกำหนด (สูงสุด 15MB)'
+        : err.message;
+    return res.status(400).json({ error: message });
+  }
+  if (/PDF|pdf|multipart/i.test(err.message || '')) {
     return res.status(400).json({ error: err.message });
   }
   next(err);

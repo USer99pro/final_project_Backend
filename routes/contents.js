@@ -56,9 +56,10 @@ async function validateParticipantIds(value, major) {
   }
 
   const uniqueIds = [...new Set(ids)];
-  const count = await User.countDocuments({ _id: { $in: uniqueIds }, isActive: true, major: String(major || '').trim() });
+  const normalizedMajor = String(major || '').trim();
+  const count = await User.countDocuments({ _id: { $in: uniqueIds }, isActive: true, major: normalizedMajor });
   if (count !== uniqueIds.length) {
-    return { error: 'มี participants ที่ไม่พบในระบบ' };
+    return { error: 'ผู้ร่วมจัดทำต้องเป็นผู้ใช้ที่ใช้งานอยู่ในแผนกเดียวกับคุณ' };
   }
   return { ids: uniqueIds };
 }
@@ -67,17 +68,17 @@ async function validateAdvisorIds(value, major) {
   const ids = parseParticipantIds(value);
   if (ids == null) return { error: 'advisors must be a list of ids' };
   const uniqueIds = [...new Set(ids)];
-  if (uniqueIds.length > 5) return { error: 'A project can have at most 5 advisors' };
+  if (uniqueIds.length > 5) return { error: 'เพิ่มครูที่ปรึกษาได้สูงสุด 5 รายชื่อ' };
   if (!uniqueIds.length) return { ids: [] };
-  if (uniqueIds.some((id) => !isObjectId(id))) return { error: 'Invalid advisor id' };
+  if (uniqueIds.some((id) => !isObjectId(id))) return { error: 'รหัสครูที่ปรึกษาไม่ถูกต้อง' };
   const advisors = await Advisor.find({ _id: { $in: uniqueIds }, isActive: true }).populate('department', 'name');
-  if (advisors.length !== uniqueIds.length) return { error: 'Selected advisor was not found or is inactive' };
+  if (advisors.length !== uniqueIds.length) return { error: 'ไม่พบครูที่ปรึกษาที่เลือกหรือสถานะไม่ใช้งาน' };
   const normalizedMajor = String(major || '').trim().toLocaleLowerCase();
   const outsideDepartment = advisors.some((advisor) => {
     const advisorDepartment = String(advisor.department?.name || advisor.departmentName || '').trim().toLocaleLowerCase();
     return !normalizedMajor || advisorDepartment !== normalizedMajor;
   });
-  if (outsideDepartment) return { error: 'Advisors must belong to the project department' };
+  if (outsideDepartment) return { error: 'ครูที่ปรึกษาต้องอยู่ในแผนกเดียวกับโครงการ' };
   return { ids: uniqueIds };
 }
 
@@ -258,6 +259,12 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
       return res.status(400).json({ error: advisorResult.error });
     }
 
+    const targetStatus = status === 'published' ? 'published' : 'draft';
+    if (targetStatus === 'published' && !req.file?.filename) {
+      if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
+      return res.status(400).json({ error: 'กรุณาอัปโหลดไฟล์ PDF ก่อนเผยแพร่ผลงาน' });
+    }
+
     const item = new Content({
       title: String(title).trim(),
       description: description != null ? String(description).trim() : '',
@@ -273,7 +280,7 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
       tags: tagIds,
       pdfFilename: req.file?.filename || '',
       pdfOriginalName: req.file?.originalname || '',
-      status: status === 'published' ? 'published' : 'draft',
+      status: targetStatus,
       isPublicDownload: true,
     });
 
@@ -343,6 +350,13 @@ router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
     if (fieldErr) {
       if (uploadedPath) removePdfFile(req.file.filename);
       return res.status(400).json(fieldErr);
+    }
+
+    const nextStatus = item.status;
+    const willHavePdf = Boolean(req.file?.filename || item.pdfFilename);
+    if (nextStatus === 'published' && !willHavePdf) {
+      if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
+      return res.status(400).json({ error: 'กรุณาอัปโหลดไฟล์ PDF ก่อนเผยแพร่ผลงาน' });
     }
 
     if (participants !== undefined) {
