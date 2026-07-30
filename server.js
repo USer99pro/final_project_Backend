@@ -16,6 +16,7 @@ const uploadsRouter = require('./routes/uploads');
 const publicRouter = require('./routes/public');
 const meRouter = require('./routes/me');
 const adminRouter = require('./routes/admin');
+const advisorsRouter = require('./routes/advisors');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -46,6 +47,7 @@ app.use('/api/contents', contentsRouter);
 app.use('/api/tags', tagsRouter);
 app.use('/api/categories', categoriesRouter);
 app.use('/api/departments', departmentsRouter);
+app.use('/api/advisors', advisorsRouter);
 app.use('/api/uploads', uploadsRouter);
 app.use('/api/me', meRouter);
 app.use('/api/admin', adminRouter);

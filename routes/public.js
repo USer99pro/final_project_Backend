@@ -4,16 +4,19 @@ const express = require('express');
 const Content = require('../models/Content');
 const Category = require('../models/Category');
 const Tag = require('../models/Tag');
+const Advisor = require('../models/Advisor');
 const PdfFile = require('../models/PdfFile');
 const { uploadDir } = require('../middleware/uploadPdf');
 const { toPublicProject } = require('../utils/publicProject');
-const { buildResearchFilter } = require('../utils/searchFilter');
+const { buildResearchFilter, escapeRegex } = require('../utils/searchFilter');
+const { stripVersion } = require('../utils/serialize');
 
 const router = express.Router();
 
 const listPopulate = [
   { path: 'author', select: 'fullName' },
   { path: 'participants', select: 'fullName email studentId major' },
+  { path: 'advisor', select: 'prefix fullName academicPosition email departmentName' },
   { path: 'category', select: 'name description' },
   { path: 'tags', select: 'name' },
 ];
@@ -134,6 +137,52 @@ router.get('/tags', async (req, res) => {
     if (req.query.department) filter.department = req.query.department;
     if (req.query.category) filter.category = req.query.category;
     res.json(await Tag.find(filter).populate('department', 'name').populate('category', 'name').sort({ name: 1 }).lean());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/advisors', async (req, res) => {
+  try {
+    const filter = { isActive: true };
+    const search = req.query.q || req.query.search;
+
+    if (req.query.department) {
+      filter.$or = [
+        { department: req.query.department },
+        { departmentName: new RegExp(escapeRegex(req.query.department), 'i') },
+      ];
+    }
+
+    if (req.query.expertise) {
+      filter.expertise = new RegExp(escapeRegex(req.query.expertise), 'i');
+    }
+
+    if (search) {
+      const rx = new RegExp(escapeRegex(search), 'i');
+      const searchClauses = [
+        { fullName: rx },
+        { email: rx },
+        { academicPosition: rx },
+        { departmentName: rx },
+        { expertise: rx },
+      ];
+      if (filter.$or) {
+        filter.$and = [{ $or: filter.$or }, { $or: searchClauses }];
+        delete filter.$or;
+      } else {
+        filter.$or = searchClauses;
+      }
+    }
+
+    const advisors = await Advisor.find(filter)
+      .populate('department', 'name')
+      .sort({ fullName: 1 });
+
+    res.json({
+      count: advisors.length,
+      advisors: advisors.map(stripVersion),
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

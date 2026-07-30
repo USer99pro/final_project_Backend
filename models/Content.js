@@ -10,6 +10,7 @@ const contentSchema = new mongoose.Schema(
     academicYear: { type: String, trim: true, default: '' },
     author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    advisor: { type: mongoose.Schema.Types.ObjectId, ref: 'Advisor', default: null },
     category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
     tags: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Tag' }],
     pdfFilename: { type: String, default: '' },
@@ -21,6 +22,7 @@ const contentSchema = new mongoose.Schema(
 );
 
 contentSchema.index({ author: 1, createdAt: -1 });
+contentSchema.index({ advisor: 1 });
 contentSchema.index({ status: 1, academicYear: -1 });
 contentSchema.index({ title: 'text', abstract: 'text', studentName: 'text', description: 'text' });
 

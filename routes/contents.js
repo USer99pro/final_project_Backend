@@ -132,7 +132,7 @@ function contentJson(doc, req) {
 }
 
 function applyContentFields(item, body, user, isAdmin) {
-  const { title, description, abstract, category, tags, academicYear, major, studentName, status, isPublicDownload } =
+  const { title, description, abstract, category, tags, advisor, academicYear, major, studentName, status, isPublicDownload } =
     body;
 
   if (title != null) item.title = String(title).trim();
@@ -142,6 +142,10 @@ function applyContentFields(item, body, user, isAdmin) {
   if (studentName != null) item.studentName = String(studentName).trim();
   if (major != null) item.major = String(major).trim();
   else if (!item.major && user.major) item.major = user.major;
+
+  if (advisor !== undefined) {
+    item.advisor = advisor && mongoose.Types.ObjectId.isValid(advisor) ? advisor : null;
+  }
 
   if (status != null) {
     if (!['draft', 'published'].includes(status)) {
@@ -176,6 +180,7 @@ router.get('/', async (req, res) => {
     const items = await Content.find(filter)
       .populate('author', 'fullName email studentId major')
       .populate('participants', 'fullName email studentId major')
+      .populate('advisor', 'prefix fullName academicPosition email departmentName')
       .populate('category', 'name')
       .populate('tags', 'name')
       .sort({ createdAt: -1 });
@@ -191,6 +196,7 @@ router.get('/:id', async (req, res) => {
     const item = await Content.findById(req.params.id)
       .populate('author', 'fullName email studentId major')
       .populate('participants', 'fullName email studentId major')
+      .populate('advisor', 'prefix fullName academicPosition email departmentName')
       .populate('category', 'name description')
       .populate('tags', 'name');
     if (!item) return res.status(404).json({ error: 'ไม่พบเนื้อหา' });
@@ -207,7 +213,7 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
   const uploadedPath = req.file?.path;
 
   try {
-    const { title, description, abstract, category, tags, keywords, keyword, academicYear, major, studentName, status, participants } =
+    const { title, description, abstract, category, tags, keywords, keyword, academicYear, major, studentName, status, participants, advisor } =
       req.body;
     if (!title) return res.status(400).json({ error: 'title จำเป็น' });
 
@@ -236,6 +242,7 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
       academicYear: academicYear != null ? String(academicYear).trim() : '',
       author: req.user._id,
       participants: participantResult.ids,
+      advisor: advisor && mongoose.Types.ObjectId.isValid(advisor) ? advisor : null,
       category: categoryId,
       tags: tagIds,
       pdfFilename: req.file?.filename || '',

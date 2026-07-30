@@ -2,7 +2,7 @@ const express = require('express');
 const User = require('../models/User');
 const Content = require('../models/Content');
 const AuditLog = require('../models/AuditLog');
-const { authenticate, requireAdmin } = require('../middleware/auth');
+const { authenticate, requireAdmin, revokeAllUserTokens } = require('../middleware/auth');
 const { logAudit } = require('../utils/audit');
 const { stripVersion } = require('../utils/serialize');
 const { buildResearchFilter } = require('../utils/searchFilter');
@@ -112,12 +112,15 @@ router.patch('/users/:id/suspend', async (req, res) => {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
     user.isActive = false;
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1; // Revoke all existing JWTs
     await user.save();
+    await revokeAllUserTokens(user._id); // Revoke all refresh tokens
     await logAudit({
       userId: req.user._id,
       action: 'user_suspend',
       targetType: 'user',
       targetId: user._id,
+      metadata: { tokenVersion: user.tokenVersion },
       req,
     });
     res.json(stripVersion(user.toPublicJSON()));
@@ -155,14 +158,17 @@ router.patch('/users/:id/role', async (req, res) => {
     }
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
+    const oldRole = user.role;
     user.role = role;
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1; // Force re-login with new role in JWT
     await user.save();
+    await revokeAllUserTokens(user._id); // Revoke all refresh tokens
     await logAudit({
       userId: req.user._id,
       action: 'user_role_change',
       targetType: 'user',
       targetId: user._id,
-      metadata: { role },
+      metadata: { oldRole, newRole: role, tokenVersion: user.tokenVersion },
       req,
     });
     res.json(stripVersion(user.toPublicJSON()));
@@ -181,15 +187,18 @@ router.post('/users/:id/reset-password', async (req, res) => {
     const user = await User.findById(req.params.id).select('+password');
     if (!user) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
     user.password = String(newPassword);
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1; // Force re-login after password change
     await user.save();
+    await revokeAllUserTokens(user._id); // Revoke all refresh tokens
     await logAudit({
       userId: req.user._id,
       action: 'password_reset',
       targetType: 'user',
       targetId: user._id,
+      metadata: { tokenVersion: user.tokenVersion },
       req,
     });
-    res.json({ message: 'รีเซ็ตรหัสผ่านสำเร็จ' });
+    res.json({ message: 'รีเซ็ตรหัสผ่านสำเร็จ — ผู้ใช้ต้องเข้าสู่ระบบใหม่' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

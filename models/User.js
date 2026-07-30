@@ -13,6 +13,9 @@ const userSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     googleId: { type: String, sparse: true, unique: true },          // Google OAuth subject ID
     authProvider: { type: String, enum: ['local', 'google'], default: 'local' },
+    tokenVersion: { type: Number, default: 0 },                      // Increment to revoke all JWTs instantly
+    resetPasswordToken: { type: String, select: false },
+    resetPasswordExpires: { type: Date, select: false },
   },
   { timestamps: true, collection: 'users' }
 );

@@ -72,8 +72,9 @@ async function run() {
     const { status, data } = await request('POST', '/api/auth/login', {
       body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
     });
-    if (status === 200 && data?.token) {
-      adminToken = data.token;
+    const token = data?.accessToken || data?.token;
+    if (status === 200 && token) {
+      adminToken = token;
       ok('POST /api/auth/login (admin)');
     } else {
       fail('admin login', JSON.stringify(data));
@@ -102,8 +103,9 @@ async function run() {
         confirmPassword: gradPass,
       },
     });
-    if (status === 201 && data?.token) {
-      gradToken = data.token;
+    const token = data?.accessToken || data?.token;
+    if (status === 201 && token) {
+      gradToken = token;
       ok('POST /api/auth/register (graduate)');
     } else fail('register', JSON.stringify(data));
   }
@@ -137,6 +139,46 @@ async function run() {
     const { status: s2 } = await request('GET', '/api/me/activity', { token: gradToken });
     if (s2 === 200) ok('GET /api/me/activity');
     else fail('me/activity');
+  }
+
+  let advisorId;
+  if (adminToken) {
+    const { status, data } = await request('POST', '/api/advisors', {
+      token: adminToken,
+      body: {
+        prefix: 'ผศ.ดร.',
+        fullName: 'สมชาย ใฝ่เรียนรู้',
+        email: 'somchai@test.ac.th',
+        academicPosition: 'ผู้ช่วยศาสตราจารย์',
+        departmentName: 'วิทยาการคอมพิวเตอร์',
+        expertise: ['Machine Learning', 'Data Science'],
+        office: 'CS-301',
+      },
+    });
+    if (status === 201 && data?.advisor?._id) {
+      advisorId = data.advisor._id;
+      ok('POST /api/advisors (เพิ่มอาจารย์ที่ปรึกษา)');
+    } else {
+      fail('create advisor', JSON.stringify(data));
+    }
+  }
+
+  {
+    const { status, data } = await request('GET', '/api/advisors?q=สมชาย');
+    if (status === 200 && Array.isArray(data?.advisors) && data.advisors.length > 0) {
+      ok('GET /api/advisors?q= (ค้นหาอาจารย์ที่ปรึกษา)');
+    } else {
+      fail('search advisors', JSON.stringify(data));
+    }
+  }
+
+  {
+    const { status, data } = await request('GET', '/api/public/advisors?q=Machine');
+    if (status === 200 && Array.isArray(data?.advisors) && data.advisors.length > 0) {
+      ok('GET /api/public/advisors (ค้นหาอาจารย์ที่ปรึกษา Public)');
+    } else {
+      fail('public search advisors', JSON.stringify(data));
+    }
   }
 
   if (adminToken) {

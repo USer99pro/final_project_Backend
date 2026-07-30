@@ -19,6 +19,7 @@ function toPublicProject(doc, req) {
     tags: o.tags,
     author,
     participants: o.participants || [],
+    advisor: o.advisor || null,
     status: o.status,
     hasPdf: o.hasPdf,
     pdfFilename: o.pdfFilename || '',
