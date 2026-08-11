@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Content = require('../models/Content');
 const AuditLog = require('../models/AuditLog');
@@ -7,6 +8,11 @@ const { logAudit } = require('../utils/audit');
 const { stripVersion } = require('../utils/serialize');
 const { buildResearchFilter } = require('../utils/searchFilter');
 const { enrichContent } = require('../utils/paths');
+
+// Helper: validate MongoDB ObjectId
+function isValidId(id) {
+  return mongoose.Types.ObjectId.isValid(id) && String(id).length === 24;
+}
 
 const router = express.Router();
 
@@ -110,6 +116,7 @@ router.get('/users', async (req, res) => {
 /** PATCH /api/admin/users/:id/suspend */
 router.patch('/users/:id/suspend', async (req, res) => {
   try {
+    if (!isValidId(req.params.id)) return res.status(400).json({ error: 'User ID ไม่ถูกต้อง' });
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
     user.isActive = false;
@@ -133,6 +140,7 @@ router.patch('/users/:id/suspend', async (req, res) => {
 /** PATCH /api/admin/users/:id/activate */
 router.patch('/users/:id/activate', async (req, res) => {
   try {
+    if (!isValidId(req.params.id)) return res.status(400).json({ error: 'User ID ไม่ถูกต้อง' });
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
     user.isActive = true;
@@ -157,6 +165,7 @@ router.patch('/users/:id/role', async (req, res) => {
     if (!['graduate', 'admin'].includes(role)) {
       return res.status(400).json({ error: 'role ต้องเป็น graduate หรือ admin' });
     }
+    if (!isValidId(req.params.id)) return res.status(400).json({ error: 'User ID ไม่ถูกต้อง' });
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
     const oldRole = user.role;
@@ -178,15 +187,33 @@ router.patch('/users/:id/role', async (req, res) => {
   }
 });
 
-/** POST /api/admin/users/:id/reset-password */
+/** POST /api/admin/users/:id/reset-password
+ *  รับได้ทั้ง MongoDB _id (24 hex) และ studentId (รหัสนักศึกษา)
+ */
 router.post('/users/:id/reset-password', async (req, res) => {
   try {
+    const { id } = req.params;
     const { newPassword } = req.body;
+
+    if (!id || !String(id).trim()) {
+      return res.status(400).json({ error: 'กรุณาระบุ User ID หรือรหัสนักศึกษา' });
+    }
     if (!newPassword || String(newPassword).length < 6) {
       return res.status(400).json({ error: 'newPassword ต้องมีอย่างน้อย 6 ตัวอักษร' });
     }
-    const user = await User.findById(req.params.id).select('+password');
-    if (!user) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
+
+    // ค้นหาด้วย MongoDB _id ถ้าเป็น 24 hex, ไม่งั้นค้นด้วย studentId
+    let user = null;
+    if (isValidId(id)) {
+      user = await User.findById(id).select('+password');
+    } else {
+      user = await User.findOne({ studentId: String(id).trim() }).select('+password');
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: 'ไม่พบผู้ใช้ (ตรวจสอบ User ID หรือรหัสนักศึกษา)' });
+    }
+
     user.password = String(newPassword);
     user.tokenVersion = (user.tokenVersion ?? 0) + 1; // Force re-login after password change
     await user.save();
@@ -196,10 +223,10 @@ router.post('/users/:id/reset-password', async (req, res) => {
       action: 'password_reset',
       targetType: 'user',
       targetId: user._id,
-      metadata: { tokenVersion: user.tokenVersion },
+      metadata: { tokenVersion: user.tokenVersion, resetBy: isValidId(id) ? 'objectId' : 'studentId' },
       req,
     });
-    res.json({ message: 'รีเซ็ตรหัสผ่านสำเร็จ — ผู้ใช้ต้องเข้าสู่ระบบใหม่' });
+    res.json({ message: `รีเซ็ตรหัสผ่านสำเร็จ (${user.fullName}) — ผู้ใช้ต้องเข้าสู่ระบบใหม่` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

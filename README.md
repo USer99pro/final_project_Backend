@@ -169,8 +169,3 @@ final_project_Backend/
 └── server.js           # Entry point ของแอปพลิเคชัน Express
 ```
 
----
-
-## 🔗 การเชื่อมต่อกับ Front-End
-
-ดูรายละเอียดเพิ่มเติมในการเชื่อมต่อกับส่วนแสดงผลได้ที่ [`../Front_End/README.md`](../Front_End/README.md)

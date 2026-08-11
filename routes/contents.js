@@ -73,12 +73,6 @@ async function validateAdvisorIds(value, major) {
   if (uniqueIds.some((id) => !isObjectId(id))) return { error: 'รหัสครูที่ปรึกษาไม่ถูกต้อง' };
   const advisors = await Advisor.find({ _id: { $in: uniqueIds }, isActive: true }).populate('department', 'name');
   if (advisors.length !== uniqueIds.length) return { error: 'ไม่พบครูที่ปรึกษาที่เลือกหรือสถานะไม่ใช้งาน' };
-  const normalizedMajor = String(major || '').trim().toLocaleLowerCase();
-  const outsideDepartment = advisors.some((advisor) => {
-    const advisorDepartment = String(advisor.department?.name || advisor.departmentName || '').trim().toLocaleLowerCase();
-    return !normalizedMajor || advisorDepartment !== normalizedMajor;
-  });
-  if (outsideDepartment) return { error: 'ครูที่ปรึกษาต้องอยู่ในแผนกเดียวกับโครงการ' };
   return { ids: uniqueIds };
 }
 
