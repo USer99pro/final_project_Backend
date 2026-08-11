@@ -1,10 +1,18 @@
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Content = require('../models/Content');
 const AuditLog = require('../models/AuditLog');
+const Advisor = require('../models/Advisor');
+const Tag = require('../models/Tag');
+const Category = require('../models/Category');
+const PdfFile = require('../models/PdfFile');
 const { authenticate, requireAdmin, revokeAllUserTokens } = require('../middleware/auth');
+const { uploadPdf, uploadDir } = require('../middleware/uploadPdf');
 const { logAudit } = require('../utils/audit');
+const { logActivity } = require('../utils/activity');
 const { stripVersion } = require('../utils/serialize');
 const { buildResearchFilter } = require('../utils/searchFilter');
 const { enrichContent } = require('../utils/paths');
@@ -244,6 +252,236 @@ router.get('/works', async (req, res) => {
       .populate('tags', 'name')
       .sort({ createdAt: -1 });
     res.json(items.map((item) => stripVersion(enrichContent(item, req))));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Helpers (shared with admin work routes) ───────────────────────────────
+
+function parseIdList(value) {
+  if (value == null || value === '') return [];
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  return String(value).split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+function parseParticipantIds(value) {
+  if (value == null || value === '') return [];
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value === 'string') return parseIdList(value);
+  return null;
+}
+
+function isObjectId(value) {
+  return mongoose.Types.ObjectId.isValid(value) && String(new mongoose.Types.ObjectId(value)) === String(value);
+}
+
+function normalizeKeywords(value) {
+  return [...new Set(
+    parseIdList(value)
+      .map((kw) => kw.replace(/\s+/g, ' ').trim())
+      .filter((kw) => kw && kw.length <= 60)
+  )].slice(0, 20);
+}
+
+async function adminValidateParticipants(value) {
+  const ids = parseParticipantIds(value);
+  if (ids == null) return { error: 'participants ต้องเป็น array หรือรายการ id' };
+  if (!ids.length) return { ids: [] };
+  const invalid = ids.filter((id) => !isObjectId(id));
+  if (invalid.length) return { error: `participants มี id ไม่ถูกต้อง: ${invalid.join(', ')}` };
+  const uniqueIds = [...new Set(ids)];
+  // Admin can assign any active user regardless of major
+  const count = await User.countDocuments({ _id: { $in: uniqueIds }, isActive: true });
+  if (count !== uniqueIds.length) return { error: 'ผู้ร่วมจัดทำต้องเป็นผู้ใช้ที่ใช้งานอยู่ในระบบ' };
+  return { ids: uniqueIds };
+}
+
+async function adminValidateAdvisors(value) {
+  const ids = parseParticipantIds(value);
+  if (ids == null) return { error: 'advisors must be a list of ids' };
+  const uniqueIds = [...new Set(ids)];
+  if (uniqueIds.length > 5) return { error: 'เพิ่มครูที่ปรึกษาได้สูงสุด 5 รายชื่อ' };
+  if (!uniqueIds.length) return { ids: [] };
+  if (uniqueIds.some((id) => !isObjectId(id))) return { error: 'รหัสครูที่ปรึกษาไม่ถูกต้อง' };
+  const advisors = await Advisor.find({ _id: { $in: uniqueIds }, isActive: true });
+  if (advisors.length !== uniqueIds.length) return { error: 'ไม่พบครูที่ปรึกษาที่เลือกหรือสถานะไม่ใช้งาน' };
+  return { ids: uniqueIds };
+}
+
+async function adminResolveTagIds(tagValue, keywordValue, userId) {
+  const values = parseIdList(tagValue);
+  const tagIds = values.filter((id) => mongoose.Types.ObjectId.isValid(id));
+  const keywords = normalizeKeywords([
+    ...values.filter((v) => !mongoose.Types.ObjectId.isValid(v)),
+    ...parseIdList(keywordValue),
+  ]);
+  for (const name of keywords) {
+    let tag = await Tag.findOne({ name, department: null, category: null });
+    if (!tag) {
+      try { tag = await Tag.create({ name, createdBy: userId }); }
+      catch (err) {
+        if (err.code !== 11000) throw err;
+        tag = await Tag.findOne({ name, department: null, category: null });
+      }
+    }
+    if (tag) tagIds.push(String(tag._id));
+  }
+  return [...new Set(tagIds)];
+}
+
+async function removePdfFile(filename) {
+  if (!filename) return;
+  const filePath = path.join(uploadDir, filename);
+  if (fs.existsSync(filePath)) {
+    try { fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
+  }
+  try { await PdfFile.deleteOne({ filename }); } catch (_) { /* ignore */ }
+}
+
+/** PATCH /api/admin/works/:id — Admin edit any work (no department restriction) */
+router.patch('/works/:id', uploadPdf.single('pdf'), async (req, res) => {
+  const uploadedPath = req.file?.path;
+  try {
+    if (!isValidId(req.params.id)) {
+      if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
+      return res.status(400).json({ error: 'Work ID ไม่ถูกต้อง' });
+    }
+
+    const item = await Content.findById(req.params.id);
+    if (!item) {
+      if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
+      return res.status(404).json({ error: 'ไม่พบผลงานวิจัย' });
+    }
+
+    const { title, description, abstract, category, tags, keywords, keyword,
+            academicYear, major, studentName, status, isPublicDownload,
+            participants, advisors, advisor } = req.body;
+
+    if (title != null) item.title = String(title).trim();
+    if (description != null) item.description = String(description).trim();
+    if (abstract != null) item.abstract = String(abstract).trim();
+    if (academicYear != null) item.academicYear = String(academicYear).trim();
+    if (studentName != null) item.studentName = String(studentName).trim();
+    if (major != null) item.major = String(major).trim();
+    if (isPublicDownload != null) item.isPublicDownload = isPublicDownload === true || isPublicDownload === 'true';
+
+    const prevStatus = item.status;
+    if (status != null) {
+      if (!['draft', 'published'].includes(status)) {
+        if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
+        return res.status(400).json({ error: 'status ต้องเป็น draft หรือ published' });
+      }
+      item.status = status;
+      if (status === 'published') item.isPublicDownload = true;
+    }
+
+    const willHavePdf = Boolean(req.file?.filename || item.pdfFilename);
+    if (item.status === 'published' && !willHavePdf) {
+      if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
+      return res.status(400).json({ error: 'กรุณาอัปโหลดไฟล์ PDF ก่อนเผยแพร่ผลงาน' });
+    }
+
+    if (participants !== undefined) {
+      const result = await adminValidateParticipants(participants);
+      if (result.error) {
+        if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
+        return res.status(400).json({ error: result.error });
+      }
+      item.participants = result.ids;
+    }
+
+    if (advisors !== undefined || advisor !== undefined) {
+      const result = await adminValidateAdvisors(advisors !== undefined ? advisors : advisor);
+      if (result.error) {
+        if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
+        return res.status(400).json({ error: result.error });
+      }
+      item.advisors = result.ids;
+      item.advisor = result.ids[0] || null;
+    }
+
+    if (category !== undefined) {
+      item.category = category && mongoose.Types.ObjectId.isValid(category) ? category : null;
+    }
+
+    if (tags !== undefined || keywords !== undefined || keyword !== undefined) {
+      item.tags = await adminResolveTagIds(tags, keywords ?? keyword, req.user._id);
+    }
+
+    if (req.file) {
+      await removePdfFile(item.pdfFilename);
+      const fileBuffer = fs.readFileSync(req.file.path);
+      await PdfFile.create({
+        filename: req.file.filename,
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        data: fileBuffer,
+      });
+      try { fs.unlinkSync(req.file.path); } catch (_) { /* ignore */ }
+      item.pdfFilename = req.file.filename;
+      item.pdfOriginalName = req.file.originalname;
+    }
+
+    await item.save();
+
+    if (prevStatus !== item.status) {
+      await logActivity({
+        contentId: item._id,
+        byUser: req.user._id,
+        fromStatus: prevStatus,
+        toStatus: item.status,
+        note: 'Admin อัปเดตสถานะผลงาน',
+      });
+    }
+    await logAudit({
+      userId: req.user._id,
+      action: 'work_edit',
+      targetType: 'content',
+      targetId: item._id,
+      metadata: { prevStatus, newStatus: item.status },
+      req,
+    });
+
+    const populated = await Content.findById(item._id)
+      .populate('author', 'fullName email studentId major')
+      .populate('participants', 'fullName email studentId major')
+      .populate('advisor advisors', 'prefix fullName academicPosition email departmentName')
+      .populate('category', 'name')
+      .populate('tags', 'name');
+
+    res.json(stripVersion(enrichContent(populated, req)));
+  } catch (err) {
+    if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** DELETE /api/admin/works/:id — Admin delete any work */
+router.delete('/works/:id', async (req, res) => {
+  try {
+    if (!isValidId(req.params.id)) return res.status(400).json({ error: 'Work ID ไม่ถูกต้อง' });
+    const item = await Content.findById(req.params.id);
+    if (!item) return res.status(404).json({ error: 'ไม่พบผลงานวิจัย' });
+
+    if (item.pdfFilename) await removePdfFile(item.pdfFilename);
+    await logActivity({
+      contentId: item._id,
+      byUser: req.user._id,
+      fromStatus: item.status,
+      toStatus: 'deleted',
+      note: 'Admin ลบผลงาน',
+    });
+    await logAudit({
+      userId: req.user._id,
+      action: 'work_delete',
+      targetType: 'content',
+      targetId: item._id,
+      req,
+    });
+    await item.deleteOne();
+    res.json({ message: 'ลบผลงานแล้ว', id: item._id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
