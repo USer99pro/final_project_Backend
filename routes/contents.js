@@ -64,7 +64,8 @@ async function validateParticipantIds(value, major) {
   return { ids: uniqueIds };
 }
 
-async function validateAdvisorIds(value, major) {
+// ตรวจสอบรายชื่อครูที่ปรึกษา (อนุญาตให้เลือกครูที่ปรึกษานอกแผนกได้ ไม่จำกัดเฉพาะแผนกของตนเอง ทั้งสิทธิ์ graduate และ admin)
+async function validateAdvisorIds(value) {
   const ids = parseParticipantIds(value);
   if (ids == null) return { error: 'advisors must be a list of ids' };
   const uniqueIds = [...new Set(ids)];
