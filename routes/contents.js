@@ -248,7 +248,7 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
       if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
       return res.status(400).json({ error: participantResult.error });
     }
-    const advisorResult = await validateAdvisorIds(advisors !== undefined ? advisors : advisor, projectMajor);
+    const advisorResult = await validateAdvisorIds(advisors !== undefined ? advisors : advisor);
     if (advisorResult.error) {
       if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
       return res.status(400).json({ error: advisorResult.error });
@@ -363,7 +363,7 @@ router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
       item.participants = participantResult.ids;
     }
     if (advisors !== undefined || advisor !== undefined) {
-      const advisorResult = await validateAdvisorIds(advisors !== undefined ? advisors : advisor, author?.major);
+      const advisorResult = await validateAdvisorIds(advisors !== undefined ? advisors : advisor);
       if (advisorResult.error) {
         if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
         return res.status(400).json({ error: advisorResult.error });
