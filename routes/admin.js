@@ -16,6 +16,7 @@ const { logActivity } = require('../utils/activity');
 const { stripVersion } = require('../utils/serialize');
 const { buildResearchFilter } = require('../utils/searchFilter');
 const { enrichContent } = require('../utils/paths');
+const analyticsRoutes = require('./analyticsRoutes');
 
 // Helper: validate MongoDB ObjectId
 function isValidId(id) {
@@ -25,6 +26,7 @@ function isValidId(id) {
 const router = express.Router();
 
 router.use(authenticate, requireAdmin);
+router.use('/analytics', analyticsRoutes);
 
 /** GET /api/admin/dashboard */
 router.get('/dashboard', async (_req, res) => {
