@@ -17,6 +17,7 @@ const publicRouter = require('./routes/public');
 const meRouter = require('./routes/me');
 const adminRouter = require('./routes/admin');
 const advisorsRouter = require('./routes/advisors');
+const analyticsRouter = require('./routes/analyticsRoutes');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -50,6 +51,7 @@ app.use('/api/departments', departmentsRouter);
 app.use('/api/advisors', advisorsRouter);
 app.use('/api/uploads', uploadsRouter);
 app.use('/api/me', meRouter);
+app.use('/api/admin/analytics', analyticsRouter);
 app.use('/api/admin', adminRouter);
 
 app.use((err, _req, res, next) => {
