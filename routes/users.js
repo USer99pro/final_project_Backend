@@ -2,7 +2,7 @@ const express = require('express');
 const User = require('../models/User');
 const Advisor = require('../models/Advisor');
 const Department = require('../models/Department');
-const { authenticate, requireAdmin } = require('../middleware/auth');
+const { authenticate, requireAdmin, requireGraduate } = require('../middleware/auth');
 const { stripVersion } = require('../utils/serialize');
 const { escapeRegex } = require('../utils/searchFilter');
 
@@ -119,10 +119,10 @@ router.get('/advisors/:advisorId', async (req, res) => {
 
 /**
  * POST /api/users/advisors
- * นักศึกษาและผู้ใช้งานเพิ่มอาจารย์ที่ปรึกษาคนใหม่
- * ทำการตรวจสอบว่ามีชื่อและตำแหน่งทางวิชาการตรงกันอยู่ในระบบแล้วหรือไม่
+ * บัณฑิต (graduate) และ admin เพิ่มอาจารย์ที่ปรึกษาคนใหม่
+ * ตรวจสอบว่ามีชื่อและตำแหน่งทางวิชาการตรงกันอยู่ในระบบแล้วหรือไม่
  */
-router.post('/advisors', async (req, res) => {
+router.post('/advisors', requireGraduate, async (req, res) => {
   try {
     const {
       prefix,
@@ -180,7 +180,7 @@ router.post('/advisors', async (req, res) => {
 
     let expertiseList = [];
     if (Array.isArray(expertise)) {
-      expertiseList = expertise.map((e) => String(e).trim()).filter(Boolean);
+      expertiseList = expertise.map(async (e) => String(e).trim()).filter(Boolean);
     } else if (typeof expertise === 'string' && expertise.trim()) {
       expertiseList = expertise.split(',').map((e) => e.trim()).filter(Boolean);
     }

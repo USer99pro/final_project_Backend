@@ -1,7 +1,7 @@
 const express = require('express');
 const Advisor = require('../models/Advisor');
 const Department = require('../models/Department');
-const { authenticate, requireAdmin } = require('../middleware/auth');
+const { authenticate, requireAdmin, requireGraduate } = require('../middleware/auth');
 const { stripVersion } = require('../utils/serialize');
 const { escapeRegex } = require('../utils/searchFilter');
 
@@ -94,10 +94,10 @@ router.get('/:id', async (req, res) => {
 
 /**
  * POST /api/advisors
- * เพิ่มอาจารย์ที่ปรึกษาคนใหม่ (นักศึกษาและ Admin สามารถเพิ่มได้)
+ * เพิ่มอาจารย์ที่ปรึกษาคนใหม่ (graduate และ Admin สามารถเพิ่มได้)
  * ทำการตรวจสอบว่ามีชื่อและตำแหน่งทางวิชาการตรงกันอยู่ในระบบแล้วหรือไม่
  */
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, requireGraduate, async (req, res) => {
   try {
     const {
       prefix,
