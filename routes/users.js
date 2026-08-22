@@ -1,5 +1,6 @@
 const express = require('express');
 const User = require('../models/User');
+const Content = require('../models/Content');
 const Advisor = require('../models/Advisor');
 const Department = require('../models/Department');
 const { authenticate, requireAdmin, requireGraduate } = require('../middleware/auth');
@@ -275,7 +276,16 @@ router.patch('/:id', async (req, res) => {
     if (fullName != null) user.fullName = String(fullName).trim();
     if (email != null) user.email = String(email).trim();
     if (phone != null) user.phone = String(phone).trim();
-    if (major != null) user.major = String(major).trim();
+
+    // ตรวจสอบว่ามีการเปลี่ยนสาขา (major) หรือไม่
+    let majorChanged = false;
+    let newMajor = user.major;
+    if (major != null) {
+      newMajor = String(major).trim();
+      majorChanged = newMajor !== String(user.major || '').trim();
+      user.major = newMajor;
+    }
+
     if (password != null && String(password).length >= 6) user.password = String(password);
 
     if (role != null) {
@@ -289,6 +299,12 @@ router.patch('/:id', async (req, res) => {
     }
 
     await user.save();
+
+    // หากสาขาเปลี่ยน ให้อัปเดตผลงานวิจัยทั้งหมดที่ user นี้เป็น author
+    if (majorChanged) {
+      await Content.updateMany({ author: user._id }, { $set: { major: newMajor } });
+    }
+
     res.json(stripVersion(user.toPublicJSON()));
   } catch (err) {
     if (err.code === 11000) return res.status(409).json({ error: 'อีเมลหรือรหัสนักศึกษาซ้ำ' });
