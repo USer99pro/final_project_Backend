@@ -92,14 +92,12 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Middleware ป้องกันเฉพาะ Admin สำหรับการสร้าง/แก้ไข/ลบ
-router.use(authenticate, requireAdmin);
-
 /**
  * POST /api/advisors
- * เพิ่มอาจารย์ที่ปรึกษาคนใหม่ (Admin เท่านั้น)
+ * เพิ่มอาจารย์ที่ปรึกษาคนใหม่ (นักศึกษาและ Admin สามารถเพิ่มได้)
+ * ทำการตรวจสอบว่ามีชื่อและตำแหน่งทางวิชาการตรงกันอยู่ในระบบแล้วหรือไม่
  */
-router.post('/', async (req, res) => {
+router.post('/', authenticate, async (req, res) => {
   try {
     const {
       prefix,
@@ -117,6 +115,31 @@ router.post('/', async (req, res) => {
 
     if (!fullName || !String(fullName).trim()) {
       return res.status(400).json({ error: 'fullName จำเป็นต้องระบุ' });
+    }
+
+    const cleanFullName = String(fullName).trim();
+    const cleanPosition = academicPosition ? String(academicPosition).trim() : '';
+
+    // ตรวจสอบข้อมูลชื่อและตำแหน่งของครูที่ปรึกษาว่ามีอยู่ในระบบแล้วหรือไม่
+    const duplicateFilter = {
+      fullName: new RegExp(`^${escapeRegex(cleanFullName)}$`, 'i'),
+    };
+    if (cleanPosition) {
+      duplicateFilter.academicPosition = new RegExp(`^${escapeRegex(cleanPosition)}$`, 'i');
+    } else {
+      duplicateFilter.$or = [
+        { academicPosition: '' },
+        { academicPosition: null },
+        { academicPosition: { $exists: false } },
+      ];
+    }
+
+    const existingAdvisor = await Advisor.findOne(duplicateFilter);
+    if (existingAdvisor) {
+      return res.status(409).json({
+        error: 'มีข้อมูลอาจารย์ที่ปรึกษา (ชื่อและตำแหน่งทางวิชาการตรงกัน) อยู่ในระบบแล้ว',
+        advisor: stripVersion(existingAdvisor),
+      });
     }
 
     let deptObjId = null;
@@ -139,10 +162,10 @@ router.post('/', async (req, res) => {
 
     const advisor = await Advisor.create({
       prefix: prefix ? String(prefix).trim() : '',
-      fullName: String(fullName).trim(),
+      fullName: cleanFullName,
       email: email ? String(email).trim().toLowerCase() : '',
       phone: phone ? String(phone).trim() : '',
-      academicPosition: academicPosition ? String(academicPosition).trim() : '',
+      academicPosition: cleanPosition,
       department: deptObjId,
       departmentName: resolvedDeptName,
       expertise: expertiseList,
@@ -166,7 +189,7 @@ router.post('/', async (req, res) => {
  * PATCH /api/advisors/:id
  * แก้ไขข้อมูลอาจารย์ที่ปรึกษา (Admin เท่านั้น)
  */
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
     const advisor = await Advisor.findById(req.params.id);
     if (!advisor) {
@@ -238,7 +261,7 @@ router.patch('/:id', async (req, res) => {
  * DELETE /api/advisors/:id
  * ลบข้อมูลอาจารย์ที่ปรึกษา (Admin เท่านั้น)
  */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
     const advisor = await Advisor.findByIdAndDelete(req.params.id);
     if (!advisor) {

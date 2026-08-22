@@ -98,6 +98,10 @@ npm start
 
 - `GET /api/me/works` — ดึงรายการผลงานวิจัยของตนเอง
 - `GET /api/me/activity` — ดึงประวัติการเข้าใช้งานและกิจกรรมของตนเอง
+- `GET /api/me/advisors` — ดึงรายการอาจารย์ที่ปรึกษาในผลงานของตนเอง
+- `GET /api/users/advisors` — ดึงรายการและค้นหาอาจารย์ที่ปรึกษาสำหรับผู้ใช้งาน (`?q=`, `major`, `department`, `expertise`, `page`, `limit`)
+- `GET /api/users/advisors/:id` — ดูรายละเอียดข้อมูลอาจารย์ที่ปรึกษาตาม ID
+- `POST /api/users/advisors` หรือ `POST /api/advisors` — เพิ่มข้อมูลอาจารย์ที่ปรึกษาใหม่ (มีการตรวจสอบชื่อและตำแหน่งทางวิชาการซ้ำก่อนเพิ่ม)
 - `GET /api/contents` — ดึงรายการผลงาน
 - `POST /api/contents` — สร้างผลงานวิจัยใหม่
 - `GET /api/contents/:id` — ดูรายละเอียดผลงานตาม ID

@@ -44,4 +44,39 @@ router.get('/activity', async (req, res) => {
   }
 });
 
+/** GET /api/me/advisors — อาจารย์ที่ปรึกษาในผลงานของตนเอง */
+router.get('/advisors', async (req, res) => {
+  try {
+    const works = await Content.find({
+      $or: [{ author: req.user._id }, { participants: req.user._id }],
+    }).populate('advisors advisor', 'prefix fullName email phone academicPosition department departmentName expertise office avatar isActive');
+
+    const advisorMap = new Map();
+    for (const work of works) {
+      const list = [...(work.advisors || []), ...(work.advisor ? [work.advisor] : [])];
+      for (const adv of list) {
+        if (adv && adv._id) {
+          const idStr = String(adv._id);
+          if (!advisorMap.has(idStr)) {
+            advisorMap.set(idStr, {
+              ...stripVersion(adv.toObject ? adv.toObject() : adv),
+              worksCount: 1,
+            });
+          } else {
+            advisorMap.get(idStr).worksCount += 1;
+          }
+        }
+      }
+    }
+
+    const advisors = Array.from(advisorMap.values());
+    res.json({
+      count: advisors.length,
+      advisors,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
