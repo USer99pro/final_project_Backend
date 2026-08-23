@@ -6,6 +6,8 @@ const Category = require('../models/Category');
 const Tag = require('../models/Tag');
 const Advisor = require('../models/Advisor');
 const PdfFile = require('../models/PdfFile');
+const User = require('../models/User');
+const Department = require('../models/Department');
 const { uploadDir } = require('../middleware/uploadPdf');
 const { toPublicProject } = require('../utils/publicProject');
 const { buildResearchFilter, escapeRegex } = require('../utils/searchFilter');
@@ -23,6 +25,34 @@ const listPopulate = [
 ];
 
 /** GET /api/public/projects — สืบค้นผลงานเผยแพร่ (ไม่ต้อง login) */
+/** GET /api/public/stats — สถิติภาพรวมสำหรับหน้าแรก */
+router.get('/stats', async (req, res) => {
+  try {
+    const [totalProjects, totalStudents, totalMajors, latestYearDoc] = await Promise.all([
+      Content.countDocuments({ status: 'published' }),
+      User.countDocuments({ role: { $in: ['graduate', 'user'] } }),
+      Department.countDocuments({ isActive: true }),
+      Content.findOne({ status: 'published', academicYear: { $ne: '' } })
+        .sort({ academicYear: -1 })
+        .select('academicYear')
+        .lean(),
+    ]);
+
+    const latestYear = latestYearDoc?.academicYear
+      ? Number(latestYearDoc.academicYear)
+      : new Date().getFullYear() + 543;
+
+    res.json({
+      totalProjects,
+      totalStudents,
+      totalMajors,
+      latestYear,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/projects', async (req, res) => {
   try {
     const filter = await buildResearchFilter(req.query, { publishedOnly: true });
