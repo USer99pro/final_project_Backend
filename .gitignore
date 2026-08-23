@@ -156,5 +156,8 @@ vite.config.ts.timestamp-*
 node_modules
 node_modules/*
 
+# Evaluation files
 .env
 
+# Markdown files
+*.md
