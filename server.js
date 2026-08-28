@@ -5,6 +5,8 @@ const cors = require('cors');
 const multer = require('multer');
 const session = require('express-session');
 const passport = require('./middleware/passport');
+const { securityHeaders, permissionsPolicy } = require('./middleware/securityHeaders');
+const { globalLimiter, authLimiter } = require('./middleware/rateLimiter');
 const { connectDB } = require('./config/db');
 const authRouter = require('./routes/auth');
 const usersRouter = require('./routes/users');
@@ -18,10 +20,39 @@ const meRouter = require('./routes/me');
 const adminRouter = require('./routes/admin');
 const advisorsRouter = require('./routes/advisors');
 
+const IS_PROD = process.env.NODE_ENV === 'production';
+
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-app.use(cors());
+// ── Security: Helmet headers + Permissions-Policy ────────────────────────────
+app.use(securityHeaders());
+app.use(permissionsPolicy);
+
+// ── CORS — whitelist frontend origin only ────────────────────────────────────
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const ALLOWED_ORIGINS = [
+  FRONTEND_URL,
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:5174',
+];
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow non-browser requests (Postman, server-to-server) in development
+      if (!origin || ALLOWED_ORIGINS.includes(origin) || !IS_PROD) {
+        return callback(null, true);
+      }
+      callback(new Error(`CORS: origin '${origin}' not allowed`));
+    },
+    credentials: true,
+  })
+);
+
+// ── Global rate limit (100 req / 15 min per IP) ───────────────────────────────
+app.use(globalLimiter);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -41,7 +72,8 @@ app.use(passport.session());
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 app.use('/api/public', publicRouter);
-app.use('/api/auth', authRouter);
+// Auth routes get a stricter rate limit (20 req / 15 min per IP)
+app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/contents', contentsRouter);
 app.use('/api/tags', tagsRouter);
@@ -61,6 +93,10 @@ app.use((req, res) => {
 });
 
 app.use((err, _req, res, next) => {
+  // CORS rejection
+  if (err.message && err.message.startsWith('CORS:')) {
+    return res.status(403).json({ error: err.message });
+  }
   if (err instanceof multer.MulterError) {
     const message =
       err.code === 'LIMIT_FILE_SIZE'
@@ -75,7 +111,11 @@ app.use((err, _req, res, next) => {
 });
 
 app.use((err, _req, res, _next) => {
-  res.status(500).json({ error: err.message || 'Server error' });
+  // ── Sanitize error responses in production ──────────────────────────────
+  // Never leak internal stack traces or raw error messages to clients.
+  const message = IS_PROD ? 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์' : (err.message || 'Server error');
+  if (!IS_PROD) console.error('[Server Error]', err);
+  res.status(500).json({ error: message });
 });
 
 connectDB()
