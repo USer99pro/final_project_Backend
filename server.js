@@ -29,19 +29,46 @@ const PORT = Number(process.env.PORT) || 3000;
 app.use(securityHeaders());
 app.use(permissionsPolicy);
 
-// ── CORS — whitelist frontend origin only ────────────────────────────────────
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-const ALLOWED_ORIGINS = [
-  FRONTEND_URL,
-  'http://localhost:3000',
+// ── CORS — whitelist frontend origins ────────────────────────────────────────
+const rawFrontendUrls = (process.env.FRONTEND_URL || 'http://localhost:5173')
+  .split(',')
+  .map((url) => url.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
+const defaultOrigins = [
+  'https://www.udvc-research.online',
+  'https://udvc-research.online',
   'http://localhost:5173',
   'http://localhost:5174',
+  'http://localhost:3000',
+  'http://localhost:3500',
 ];
+
+const expandedOrigins = [];
+rawFrontendUrls.forEach((url) => {
+  expandedOrigins.push(url);
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.startsWith('www.')) {
+      const nonWwwHost = parsed.hostname.replace(/^www\./, '');
+      expandedOrigins.push(`${parsed.protocol}//${nonWwwHost}`);
+    } else if (parsed.hostname !== 'localhost' && !parsed.hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+      expandedOrigins.push(`${parsed.protocol}//www.${parsed.hostname}`);
+    }
+  } catch (_e) {
+    // Ignore invalid URL format in env
+  }
+});
+
+const ALLOWED_ORIGINS = Array.from(new Set([...expandedOrigins, ...defaultOrigins]));
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow non-browser requests (Postman, server-to-server) in development
-      if (!origin || ALLOWED_ORIGINS.includes(origin) || !IS_PROD) {
+      // Allow non-browser requests (Postman, server-to-server) or matched origins
+      if (!origin) return callback(null, true);
+      const cleanOrigin = origin.replace(/\/$/, '');
+      if (ALLOWED_ORIGINS.includes(cleanOrigin) || !IS_PROD) {
         return callback(null, true);
       }
       callback(new Error(`CORS: origin '${origin}' not allowed`));
