@@ -25,6 +25,9 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+// Trust reverse proxy (e.g. Render, Heroku, Cloudflare) to correctly identify client IP in rate limiting
+app.set('trust proxy', Number(process.env.TRUST_PROXY) || 1);
+
 // ── Security: Helmet headers + Permissions-Policy ────────────────────────────
 app.use(securityHeaders());
 app.use(permissionsPolicy);

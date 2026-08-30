@@ -20,25 +20,25 @@ function rateLimitHandler(req, res) {
 
 /**
  * Global limiter — applied to all routes.
- * 100 requests per 15 minutes per IP.
+ * Default: 1,000 requests per 15 minutes per IP (customizable via RATE_LIMIT_GLOBAL_MAX).
  */
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_GLOBAL_MAX) || 1000,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
-  skip: (req) => req.path === '/health',
+  skip: (req) => req.path === '/health' || req.method === 'OPTIONS',
 });
 
 /**
  * Auth limiter — stricter, applied to /api/auth routes.
- * 20 requests per 15 minutes per IP.
+ * Default: 30 requests per 15 minutes per IP (customizable via RATE_LIMIT_AUTH_MAX).
  * Protects login/register/forgot-password from brute-force.
  */
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
+  windowMs: Number(process.env.RATE_LIMIT_AUTH_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_AUTH_MAX) || 30,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler,
