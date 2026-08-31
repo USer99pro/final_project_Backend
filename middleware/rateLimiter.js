@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 /**
  * rateLimiter.js
@@ -13,13 +13,13 @@ const rateLimit = require('express-rate-limit');
 /** Generic JSON error handler for rate limit responses */
 function rateLimitHandler(req, res) {
   res.status(429).json({
-    error: 'Too many requests — please try again later.',
+    error: 'Too many requests â€” please try again later.',
     retryAfter: Math.ceil(req.rateLimit.resetTime / 1000),
   });
 }
 
 /**
- * Global limiter — applied to all routes.
+ * Global limiter â€” applied to all routes.
  * Default: 1,000 requests per 15 minutes per IP (customizable via RATE_LIMIT_GLOBAL_MAX).
  */
 const globalLimiter = rateLimit({
@@ -32,7 +32,7 @@ const globalLimiter = rateLimit({
 });
 
 /**
- * Auth limiter — stricter, applied to /api/auth routes.
+ * Auth limiter â€” stricter, applied to /api/auth routes.
  * Default: 30 requests per 15 minutes per IP (customizable via RATE_LIMIT_AUTH_MAX).
  * Protects login/register/forgot-password from brute-force.
  */
@@ -44,4 +44,17 @@ const authLimiter = rateLimit({
   handler: rateLimitHandler,
 });
 
-module.exports = { globalLimiter, authLimiter };
+/**
+ * Analytics tracking limiter — public POST /api/analytics
+ * Default: 300 requests per 15 minutes per IP.
+ * Generous enough for real users but limits abuse.
+ */
+const analyticsLimiter = rateLimit({
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_ANALYTICS_MAX) || 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+});
+
+module.exports = { globalLimiter, authLimiter, analyticsLimiter };

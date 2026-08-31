@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const analyticsService = require('../services/analyticsService');
 
 const router = express.Router();
@@ -10,7 +10,7 @@ function handler(method) {
       res.json(data);
     } catch (err) {
       console.error(`[Analytics:${method}]`, err);
-      res.status(500).json({ error: 'ไม่สามารถโหลดข้อมูล Analytics ได้' });
+      res.status(500).json({ error: 'à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¹‚à¸«à¸¥à¸”à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ Analytics à¹„à¸”à¹‰' });
     }
   };
 }
@@ -27,4 +27,11 @@ router.get('/popular-works', handler('popularWorks'));
 router.get('/usage-trend', handler('usageTrend'));
 router.get('/insights', handler('insights'));
 
+// New visitor-analytics routes (from Analytics model)
+router.get('/summary', handler('summary'));
+router.get('/visitor-trends', handler('visitorTrends'));
+router.get('/top-pages', handler('topPages'));
+router.get('/devices', handler('deviceAnalytics'));
+
 module.exports = router;
+

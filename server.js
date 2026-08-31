@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -6,7 +6,8 @@ const multer = require('multer');
 const session = require('express-session');
 const passport = require('./middleware/passport');
 const { securityHeaders, permissionsPolicy } = require('./middleware/securityHeaders');
-const { globalLimiter, authLimiter } = require('./middleware/rateLimiter');
+const { globalLimiter, authLimiter, analyticsLimiter } = require('./middleware/rateLimiter');
+const analyticsTrackRouter = require('./routes/analyticsTrack');
 const { connectDB } = require('./config/db');
 const authRouter = require('./routes/auth');
 const usersRouter = require('./routes/users');
@@ -28,11 +29,11 @@ const PORT = Number(process.env.PORT) || 3000;
 // Trust reverse proxy (e.g. Render, Heroku, Cloudflare) to correctly identify client IP in rate limiting
 app.set('trust proxy', Number(process.env.TRUST_PROXY) || 1);
 
-// ── Security: Helmet headers + Permissions-Policy ────────────────────────────
+// â”€â”€ Security: Helmet headers + Permissions-Policy â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.use(securityHeaders());
 app.use(permissionsPolicy);
 
-// ── CORS — whitelist frontend origins ────────────────────────────────────────
+// â”€â”€ CORS â€” whitelist frontend origins â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const rawFrontendUrls = (process.env.FRONTEND_URL || 'http://localhost:5173')
   .split(',')
   .map((url) => url.trim().replace(/\/$/, ''))
@@ -80,20 +81,20 @@ app.use(
   })
 );
 
-// ── Global rate limit (100 req / 15 min per IP) ───────────────────────────────
+// â”€â”€ Global rate limit (100 req / 15 min per IP) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.use(globalLimiter);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ── Session (required by Passport for OAuth state parameter) ─────────────────
+// â”€â”€ Session (required by Passport for OAuth state parameter) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'change-this-session-secret',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 10 * 60 * 1000 }, // 10 min — only for OAuth handshake
+    cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 10 * 60 * 1000 }, // 10 min â€” only for OAuth handshake
   })
 );
 app.use(passport.initialize());
@@ -102,6 +103,8 @@ app.use(passport.session());
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 app.use('/api/public', publicRouter);
+// Analytics tracking — public endpoint (rate-limited, validated, no auth required)
+app.use('/api/analytics', analyticsLimiter, analyticsTrackRouter);
 // Auth routes get a stricter rate limit (20 req / 15 min per IP)
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/users', usersRouter);
@@ -130,7 +133,7 @@ app.use((err, _req, res, next) => {
   if (err instanceof multer.MulterError) {
     const message =
       err.code === 'LIMIT_FILE_SIZE'
-        ? 'ไฟล์ PDF มีขนาดใหญ่เกินกำหนด (สูงสุด 15MB)'
+        ? 'à¹„à¸Ÿà¸¥à¹Œ PDF à¸¡à¸µà¸‚à¸™à¸²à¸”à¹ƒà¸«à¸à¹ˆà¹€à¸à¸´à¸™à¸à¸³à¸«à¸™à¸” (à¸ªà¸¹à¸‡à¸ªà¸¸à¸” 15MB)'
         : err.message;
     return res.status(400).json({ error: message });
   }
@@ -141,9 +144,9 @@ app.use((err, _req, res, next) => {
 });
 
 app.use((err, _req, res, _next) => {
-  // ── Sanitize error responses in production ──────────────────────────────
+  // â”€â”€ Sanitize error responses in production â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Never leak internal stack traces or raw error messages to clients.
-  const message = IS_PROD ? 'เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์' : (err.message || 'Server error');
+  const message = IS_PROD ? 'à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¸ à¸²à¸¢à¹ƒà¸™à¹€à¸‹à¸´à¸£à¹Œà¸Ÿà¹€à¸§à¸­à¸£à¹Œ' : (err.message || 'Server error');
   if (!IS_PROD) console.error('[Server Error]', err);
   res.status(500).json({ error: message });
 });
@@ -151,15 +154,15 @@ app.use((err, _req, res, _next) => {
 connectDB()
   .then(() => {
     const server = app.listen(PORT, () => {
-      console.log(`✅ API ready → http://localhost:${PORT}`);
+      console.log(`âœ… API ready â†’ http://localhost:${PORT}`);
       console.log(`   JWT expiry    : 30 days`);
-      console.log(`   Google OAuth  : ${process.env.GOOGLE_CLIENT_ID ? 'configured ✓' : '⚠ GOOGLE_CLIENT_ID not set'}`);
+      console.log(`   Google OAuth  : ${process.env.GOOGLE_CLIENT_ID ? 'configured âœ“' : 'âš  GOOGLE_CLIENT_ID not set'}`);
     });
 
     server.on('error', (err) => {
       if (err.code === 'EADDRINUSE') {
-        console.error(`\n❌ พอร์ต ${PORT} ถูกใช้งานอยู่แล้ว`);
-        console.error(`   netstat -ano | findstr :${PORT}  แล้ว  taskkill /PID <pid> /F\n`);
+        console.error(`\nâŒ à¸žà¸­à¸£à¹Œà¸• ${PORT} à¸–à¸¹à¸à¹ƒà¸Šà¹‰à¸‡à¸²à¸™à¸­à¸¢à¸¹à¹ˆà¹à¸¥à¹‰à¸§`);
+        console.error(`   netstat -ano | findstr :${PORT}  à¹à¸¥à¹‰à¸§  taskkill /PID <pid> /F\n`);
         process.exit(1);
       }
       throw err;
@@ -169,3 +172,4 @@ connectDB()
     console.error(err);
     process.exit(1);
   });
+
