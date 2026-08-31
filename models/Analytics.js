@@ -27,7 +27,7 @@ const analyticsSchema = new mongoose.Schema(
 
     event: {
       type: String,
-      enum: ['PAGE_VIEW', 'LOGIN', 'REGISTER'],
+      enum: ['PAGE_VIEW', 'SEARCH', 'VIEW_WORK', 'DOWNLOAD_WORK', 'LOGIN', 'REGISTER'],
       required: true,
       index: true,
     },
@@ -37,6 +37,19 @@ const analyticsSchema = new mongoose.Schema(
       default: null,
       maxlength: 500,
       index: true,
+    },
+
+    workId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Content',
+      default: null,
+      index: true,
+    },
+
+    searchKeyword: {
+      type: String,
+      default: null,
+      maxlength: 200,
     },
 
     device: {
@@ -52,6 +65,18 @@ const analyticsSchema = new mongoose.Schema(
     },
 
     os: {
+      type: String,
+      default: null,
+      maxlength: 100,
+    },
+
+    country: {
+      type: String,
+      default: null,
+      maxlength: 100,
+    },
+
+    region: {
       type: String,
       default: null,
       maxlength: 100,

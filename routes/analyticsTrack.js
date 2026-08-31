@@ -2,18 +2,20 @@
 
 /**
  * analyticsTrack.js
- * Public POST /api/analytics — track user events (PAGE_VIEW, LOGIN, REGISTER)
- * No authentication required, but validated and rate-limited.
- * VIEW_WORK, DOWNLOAD_WORK, SEARCH are tracked separately via existing Log models.
+ * Public POST /api/analytics — track user events
+ * Events: PAGE_VIEW, SEARCH, VIEW_WORK, DOWNLOAD_WORK, LOGIN, REGISTER
  */
 
 const express = require('express');
 const mongoose = require('mongoose');
 const Analytics = require('../models/Analytics');
+const ViewLog = require('../models/ViewLog');
+const SearchLog = require('../models/SearchLog');
+const DownloadLog = require('../models/DownloadLog');
 
 const router = express.Router();
 
-const ALLOWED_EVENTS = ['PAGE_VIEW', 'LOGIN', 'REGISTER'];
+const ALLOWED_EVENTS = ['PAGE_VIEW', 'SEARCH', 'VIEW_WORK', 'DOWNLOAD_WORK', 'LOGIN', 'REGISTER'];
 const MAX_STR = 500;
 const MAX_SHORT = 100;
 
@@ -30,40 +32,42 @@ function detectDevice(ua = '') {
   return 'Unknown';
 }
 
-/**
- * POST /api/analytics
- * Body: { visitorId, sessionId, event, page, device, browser, os, referrer }
- */
 router.post('/', async (req, res) => {
   try {
     const {
       visitorId,
       sessionId,
+      userId,
       event,
       page,
+      workId,
+      searchKeyword,
       device,
       browser,
       os,
       referrer,
     } = req.body;
 
-    // --- Validate event ---
     if (!event || !ALLOWED_EVENTS.includes(event)) {
       return res.status(400).json({ error: 'Invalid event type' });
     }
 
-    // --- Sanitize and build document ---
+    const validWorkId = workId && mongoose.Types.ObjectId.isValid(workId) ? workId : null;
+    const validUserId = userId && mongoose.Types.ObjectId.isValid(userId) ? userId : null;
+
     const doc = {
       visitorId: sanitizeStr(visitorId, MAX_SHORT),
       sessionId: sanitizeStr(sessionId, MAX_SHORT),
+      userId: validUserId,
       event,
       page: sanitizeStr(page),
+      workId: validWorkId,
+      searchKeyword: sanitizeStr(searchKeyword, 200),
       referrer: sanitizeStr(referrer),
       browser: sanitizeStr(browser, MAX_SHORT),
       os: sanitizeStr(os, MAX_SHORT),
     };
 
-    // Device: use provided if valid enum, else detect from UA
     const validDevices = ['Desktop', 'Mobile', 'Tablet', 'Unknown'];
     if (device && validDevices.includes(device)) {
       doc.device = device;
@@ -72,12 +76,20 @@ router.post('/', async (req, res) => {
       doc.device = detectDevice(ua);
     }
 
+    // Save to generic analytics event collection
     await Analytics.create(doc);
 
-    // Respond immediately — do not block client
+    // Also sync to specialized log models if applicable
+    if (event === 'VIEW_WORK' && validWorkId) {
+      ViewLog.create({ workId: validWorkId, userId: validUserId }).catch(() => {});
+    } else if (event === 'DOWNLOAD_WORK' && validWorkId) {
+      DownloadLog.create({ workId: validWorkId, userId: validUserId }).catch(() => {});
+    } else if (event === 'SEARCH' && doc.searchKeyword) {
+      SearchLog.create({ keyword: doc.searchKeyword, userId: validUserId }).catch(() => {});
+    }
+
     res.status(204).end();
   } catch (err) {
-    // Silently fail for analytics — never break the user experience
     console.error('[Analytics Track]', err.message);
     res.status(500).json({ error: 'Analytics tracking failed' });
   }
