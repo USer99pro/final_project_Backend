@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Content = require('../models/Content');
 const Advisor = require('../models/Advisor');
@@ -172,10 +173,18 @@ router.post('/advisors', requireGraduate, async (req, res) => {
     let resolvedDeptName = departmentName ? String(departmentName).trim() : '';
 
     if (department) {
-      const deptDoc = await Department.findById(department);
+      let deptDoc = null;
+      if (mongoose.Types.ObjectId.isValid(department)) {
+        deptDoc = await Department.findById(department);
+      }
+      if (!deptDoc) {
+        deptDoc = await Department.findOne({ name: String(department).trim() });
+      }
       if (deptDoc) {
         deptObjId = deptDoc._id;
         if (!resolvedDeptName) resolvedDeptName = deptDoc.name;
+      } else if (!resolvedDeptName) {
+        resolvedDeptName = String(department).trim();
       }
     }
 

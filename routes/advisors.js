@@ -146,10 +146,18 @@ router.post('/', authenticate, requireGraduate, async (req, res) => {
     let resolvedDeptName = departmentName ? String(departmentName).trim() : '';
 
     if (department) {
-      const deptDoc = await Department.findById(department);
+      let deptDoc = null;
+      if (mongoose.Types.ObjectId.isValid(department)) {
+        deptDoc = await Department.findById(department);
+      }
+      if (!deptDoc) {
+        deptDoc = await Department.findOne({ name: String(department).trim() });
+      }
       if (deptDoc) {
         deptObjId = deptDoc._id;
         if (!resolvedDeptName) resolvedDeptName = deptDoc.name;
+      } else if (!resolvedDeptName) {
+        resolvedDeptName = String(department).trim();
       }
     }
 
@@ -221,12 +229,19 @@ router.patch('/:id', authenticate, requireAdmin, async (req, res) => {
 
     if (department !== undefined) {
       if (department) {
-        const deptDoc = await Department.findById(department);
+        let deptDoc = null;
+        if (mongoose.Types.ObjectId.isValid(department)) {
+          deptDoc = await Department.findById(department);
+        }
+        if (!deptDoc) {
+          deptDoc = await Department.findOne({ name: String(department).trim() });
+        }
         if (deptDoc) {
           advisor.department = deptDoc._id;
           advisor.departmentName = deptDoc.name;
         } else {
           advisor.department = null;
+          advisor.departmentName = String(department).trim();
         }
       } else {
         advisor.department = null;
