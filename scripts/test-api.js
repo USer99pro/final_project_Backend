@@ -1,4 +1,8 @@
-const baseUrl = (process.env.API_URL || 'http://localhost:3000').replace(/\/$/, '');
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
+const port = process.env.PORT || 3500;
+const baseUrl = (process.env.API_URL || `http://localhost:${port}`).replace(/\/$/, '');
 const healthUrl = `${baseUrl}/health`;
 
 async function testHealthEndpoint() {
