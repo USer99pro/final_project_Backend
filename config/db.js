@@ -10,10 +10,8 @@ if (process.env.MONGO_DNS_SERVERS) {
   }
 }
 
-let isConnected = false;
-
 async function connectDB() {
-  if (isConnected) {
+  if (mongoose.connection.readyState >= 1) {
     return mongoose.connection;
   }
 

@@ -1,4 +1,4 @@
-﻿require('dotenv').config();
+require('dotenv').config();
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -72,7 +72,13 @@ app.use(
       // Allow non-browser requests (Postman, server-to-server) or matched origins
       if (!origin) return callback(null, true);
       const cleanOrigin = origin.replace(/\/$/, '');
-      if (ALLOWED_ORIGINS.includes(cleanOrigin) || !IS_PROD) {
+      const isAllowedDomain =
+        ALLOWED_ORIGINS.includes(cleanOrigin) ||
+        !IS_PROD ||
+        cleanOrigin.endsWith('.vercel.app') ||
+        cleanOrigin.endsWith('.onrender.com');
+
+      if (isAllowedDomain) {
         return callback(null, true);
       }
       callback(new Error(`CORS: origin '${origin}' not allowed`));
@@ -151,25 +157,33 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: message });
 });
 
-connectDB()
-  .then(() => {
-    const server = app.listen(PORT, () => {
-      console.log(`âœ… API ready â†’ http://localhost:${PORT}`);
-      console.log(`   JWT expiry    : 30 days`);
-      console.log(`   Google OAuth  : ${process.env.GOOGLE_CLIENT_ID ? 'configured âœ“' : 'âš  GOOGLE_CLIENT_ID not set'}`);
-    });
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  connectDB()
+    .then(() => {
+      const server = app.listen(PORT, () => {
+        console.log(`âœ… API ready â†’ http://localhost:${PORT}`);
+        console.log(`   JWT expiry    : 30 days`);
+        console.log(`   Google OAuth  : ${process.env.GOOGLE_CLIENT_ID ? 'configured âœ“' : 'âš  GOOGLE_CLIENT_ID not set'}`);
+      });
 
-    server.on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        console.error(`\nâŒ à¸žà¸­à¸£à¹Œà¸• ${PORT} à¸–à¸¹à¸à¹ƒà¸Šà¹‰à¸‡à¸²à¸™à¸­à¸¢à¸¹à¹ˆà¹à¸¥à¹‰à¸§`);
-        console.error(`   netstat -ano | findstr :${PORT}  à¹à¸¥à¹‰à¸§  taskkill /PID <pid> /F\n`);
-        process.exit(1);
-      }
-      throw err;
+      server.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          console.error(`\nâ Œ à¸žà¸­à¸£à¹Œà¸• ${PORT} à¸–à¸¹à¸ à¹ƒà¸Šà¹‰à¸‡à¸²à¸™à¸­à¸¢à¸¹à¹ˆà¹ à¸¥à¹‰à¸§`);
+          console.error(`   netstat -ano | findstr :${PORT}  à¹ à¸¥à¹‰à¸§  taskkill /PID <pid> /F\n`);
+          process.exit(1);
+        }
+        throw err;
+      });
+    })
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
     });
-  })
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
+} else {
+  connectDB().catch((err) => {
+    console.error('MongoDB Connection Error:', err);
   });
+}
+
+module.exports = app;
 
