@@ -5,7 +5,20 @@ const RefreshToken = require('../models/RefreshToken');
 const { logAudit } = require('../utils/audit');
 
 // ── Configuration ────────────────────────────────────────────────────────────
-const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
+
+// F8: Fail fast if JWT_SECRET is absent or still the well-known default.
+// A missing or default secret allows any party to forge valid access tokens.
+const _JWT_SECRET_RAW = process.env.JWT_SECRET;
+const _JWT_SECRET_DEFAULTS = new Set(['change-me-in-production', '', undefined]);
+if (!_JWT_SECRET_RAW || _JWT_SECRET_DEFAULTS.has(_JWT_SECRET_RAW)) {
+  console.error(
+    '[FATAL] JWT_SECRET is missing or is still the default placeholder. ' +
+    'Set a strong random value in your .env file before starting the server.'
+  );
+  process.exit(1);
+}
+
+const JWT_SECRET = _JWT_SECRET_RAW;
 const ACCESS_TOKEN_EXPIRY = process.env.ACCESS_TOKEN_EXPIRY || '15m';
 const REFRESH_TOKEN_EXPIRY_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRY_DAYS) || 7;
 

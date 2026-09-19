@@ -10,12 +10,13 @@ const Tag = require('../models/Tag');
 const Category = require('../models/Category');
 const PdfFile = require('../models/PdfFile');
 const { authenticate, requireAdmin, revokeAllUserTokens } = require('../middleware/auth');
-const { uploadPdf, uploadDir } = require('../middleware/uploadPdf');
+const { uploadPdf, uploadDir, verifyPdfMagic } = require('../middleware/uploadPdf');
 const { logAudit } = require('../utils/audit');
 const { logActivity } = require('../utils/activity');
 const { stripVersion } = require('../utils/serialize');
 const { buildResearchFilter } = require('../utils/searchFilter');
 const { enrichContent } = require('../utils/paths');
+const { sendError } = require('../utils/sendError');
 const analyticsRoutes = require('./analyticsRoutes');
 
 // Helper: validate MongoDB ObjectId
@@ -79,7 +80,7 @@ router.get('/dashboard', async (_req, res) => {
       recentLogins,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -119,7 +120,7 @@ router.get('/users', async (req, res) => {
       totalPages: Math.ceil(total / limit)
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -143,7 +144,7 @@ router.patch('/users/:id/suspend', async (req, res) => {
     });
     res.json(stripVersion(user.toPublicJSON()));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -164,7 +165,7 @@ router.patch('/users/:id/activate', async (req, res) => {
     });
     res.json(stripVersion(user.toPublicJSON()));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -193,7 +194,7 @@ router.patch('/users/:id/role', async (req, res) => {
     });
     res.json(stripVersion(user.toPublicJSON()));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -238,7 +239,7 @@ router.post('/users/:id/reset-password', async (req, res) => {
     });
     res.json({ message: `รีเซ็ตรหัสผ่านสำเร็จ (${user.fullName}) — ผู้ใช้ต้องเข้าสู่ระบบใหม่` });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -255,7 +256,7 @@ router.get('/works', async (req, res) => {
       .sort({ createdAt: -1 });
     res.json(items.map((item) => stripVersion(enrichContent(item, req))));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -335,6 +336,12 @@ async function adminResolveTagIds(tagValue, keywordValue, userId) {
 async function removePdfFile(filename) {
   if (!filename) return;
   const filePath = path.join(uploadDir, filename);
+  // F10: Path-prefix guard — only allow deletions inside uploadDir
+  if (!path.resolve(filePath).startsWith(path.resolve(uploadDir) + path.sep) &&
+      path.resolve(filePath) !== path.resolve(uploadDir)) {
+    console.error('[removePdfFile] Blocked suspicious path:', filePath);
+    return;
+  }
   if (fs.existsSync(filePath)) {
     try { fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
   }
@@ -342,7 +349,7 @@ async function removePdfFile(filename) {
 }
 
 /** PATCH /api/admin/works/:id — Admin edit any work (no department restriction) */
-router.patch('/works/:id', uploadPdf.single('pdf'), async (req, res) => {
+router.patch('/works/:id', uploadPdf.single('pdf'), verifyPdfMagic, async (req, res) => {
   const uploadedPath = req.file?.path;
   try {
     if (!isValidId(req.params.id)) {
@@ -456,7 +463,7 @@ router.patch('/works/:id', uploadPdf.single('pdf'), async (req, res) => {
     res.json(stripVersion(enrichContent(populated, req)));
   } catch (err) {
     if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -485,7 +492,7 @@ router.delete('/works/:id', async (req, res) => {
     await item.deleteOne();
     res.json({ message: 'ลบผลงานแล้ว', id: item._id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -497,10 +504,11 @@ router.get('/audit-logs', async (req, res) => {
     const logs = await AuditLog.find(filter)
       .populate('userId', 'fullName email role')
       .sort({ createdAt: -1 })
-      .limit(Number(req.query.limit) || 50);
+      // F9: Cap limit to prevent OOM from unbounded admin queries
+      .limit(Math.min(Number(req.query.limit) || 50, 500));
     res.json({ count: logs.length, logs });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -510,10 +518,11 @@ router.get('/login-logs', async (req, res) => {
     const logs = await AuditLog.find({ action: 'login' })
       .populate('userId', 'fullName email role studentId')
       .sort({ createdAt: -1 })
-      .limit(Number(req.query.limit) || 50);
+      // F9: Cap limit to prevent OOM from unbounded admin queries
+      .limit(Math.min(Number(req.query.limit) || 50, 500));
     res.json({ count: logs.length, logs });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -541,7 +550,7 @@ router.get('/reports/summary', async (req, res) => {
       publishedInPeriod,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -574,7 +583,7 @@ router.get('/reports/export.csv', async (_req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename="research-report.csv"');
     res.send('\uFEFF' + header + rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 
 });

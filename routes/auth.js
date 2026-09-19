@@ -11,6 +11,7 @@ const {
   recordLogin,
 } = require('../middleware/auth');
 const { stripVersion } = require('../utils/serialize');
+const { sendError } = require('../utils/sendError');
 
 const router = express.Router();
 
@@ -65,7 +66,7 @@ router.post('/register', async (req, res) => {
       const field = Object.keys(err.keyPattern || {})[0] || 'ข้อมูล';
       return res.status(409).json({ error: `${field} นี้มีอยู่ในระบบแล้ว` });
     }
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -95,7 +96,7 @@ router.post('/login', async (req, res) => {
       user: stripVersion(user.toPublicJSON()),
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -133,13 +134,15 @@ router.post('/forgot-password', async (req, res) => {
     user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 ชั่วโมง
     await user.save();
 
+    // F2: Never return the raw resetToken in the HTTP response.
+    // The token must only be delivered out-of-band (e.g. email).
+    // Return a generic success message whether the email exists or not
+    // to prevent email enumeration.
     res.json({
-      message: 'สร้าง Token สำเร็จ กรุณานำ Token ไปกรอกเพื่อรีเซ็ตรหัสผ่าน',
-      resetToken,
-      expiresIn: '1 hour',
+      message: 'หากพบอีเมลในระบบ ระบบได้ส่งรหัสสำหรับรีเซ็ตรหัสผ่านเรียบร้อยแล้ว',
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -181,7 +184,7 @@ router.post('/reset-password', async (req, res) => {
 
     res.json({ message: 'รีเซ็ตรหัสผ่านสำเร็จ คุณสามารถเข้าสู่ระบบด้วยรหัสผ่านใหม่ได้ทันที' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -189,6 +192,7 @@ router.post('/reset-password', async (req, res) => {
  * POST /api/auth/change-password
  * เปลี่ยนรหัสผ่านสำหรับผู้ใช้งานที่เข้าสู่ระบบอยู่ (ต้องระบุรหัสผ่านเดิม)
  */
+
 router.post('/change-password', authenticate, async (req, res) => {
   try {
     const { currentPassword, newPassword, confirmPassword } = req.body;
@@ -223,7 +227,7 @@ router.post('/change-password', authenticate, async (req, res) => {
       user: stripVersion(user.toPublicJSON()),
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -253,7 +257,7 @@ router.post('/refresh', async (req, res) => {
       user: stripVersion(result.user.toPublicJSON()),
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -269,13 +273,9 @@ router.post('/logout', async (req, res) => {
     }
     res.json({ message: 'ออกจากระบบสำเร็จ' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Google OAuth 2.0
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * GET /api/auth/google

@@ -4,9 +4,10 @@ const User = require('../models/User');
 const Content = require('../models/Content');
 const Advisor = require('../models/Advisor');
 const Department = require('../models/Department');
-const { authenticate, requireAdmin, requireGraduate } = require('../middleware/auth');
+const { authenticate, requireAdmin, requireGraduate, revokeAllUserTokens } = require('../middleware/auth');
 const { stripVersion } = require('../utils/serialize');
 const { escapeRegex } = require('../utils/searchFilter');
+const { sendError } = require('../utils/sendError');
 
 const router = express.Router();
 
@@ -29,7 +30,7 @@ router.get('/', async (req, res) => {
     const users = await User.find(filter).select('-password').sort({ fullName: 1, createdAt: -1 });
     return res.json(users.map((u) => stripVersion(u.toPublicJSON())));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -99,7 +100,7 @@ router.get('/advisors', async (req, res) => {
       advisors: advisors.map(stripVersion),
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -115,15 +116,11 @@ router.get('/advisors/:advisorId', async (req, res) => {
     }
     res.json(stripVersion(advisor));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
-/**
- * POST /api/users/advisors
- * บัณฑิต (graduate) และ admin เพิ่มอาจารย์ที่ปรึกษาคนใหม่
- * ตรวจสอบว่ามีชื่อและตำแหน่งทางวิชาการตรงกันอยู่ในระบบแล้วหรือไม่
- */
+
 router.post('/advisors', requireGraduate, async (req, res) => {
   try {
     const {
@@ -189,8 +186,10 @@ router.post('/advisors', requireGraduate, async (req, res) => {
     }
 
     let expertiseList = [];
+    // F11: Remove erroneous async keyword — map callback does not need await.
+    // Using async here produces an array of Promises, not resolved strings.
     if (Array.isArray(expertise)) {
-      expertiseList = expertise.map(async (e) => String(e).trim()).filter(Boolean);
+      expertiseList = expertise.map((e) => String(e).trim()).filter(Boolean);
     } else if (typeof expertise === 'string' && expertise.trim()) {
       expertiseList = expertise.split(',').map((e) => e.trim()).filter(Boolean);
     }
@@ -216,7 +215,7 @@ router.post('/advisors', requireGraduate, async (req, res) => {
       advisor: stripVersion(populatedAdvisor),
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -230,7 +229,7 @@ router.get('/:id', async (req, res) => {
     if (!user) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
     res.json(stripVersion(user.toPublicJSON()));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -264,7 +263,7 @@ router.post('/', requireAdmin, async (req, res) => {
     res.status(201).json(stripVersion(user.toPublicJSON()));
   } catch (err) {
     if (err.code === 11000) return res.status(409).json({ error: 'อีเมลหรือรหัสนักศึกษาซ้ำ' });
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -295,8 +294,6 @@ router.patch('/:id', async (req, res) => {
       user.major = newMajor;
     }
 
-    if (password != null && String(password).length >= 6) user.password = String(password);
-
     if (role != null) {
       if (req.user.role !== 'admin') {
         return res.status(403).json({ error: 'เปลี่ยน role ได้เฉพาะ admin' });
@@ -307,7 +304,16 @@ router.patch('/:id', async (req, res) => {
       user.role = role;
     }
 
-    await user.save();
+    // F3: Revoke all existing tokens if the password changed,
+    // so old access/refresh tokens cannot be used after a profile edit.
+    if (password != null && String(password).length >= 6) {
+      user.password = String(password);
+      user.tokenVersion = (user.tokenVersion || 0) + 1;
+      await user.save();
+      await revokeAllUserTokens(user._id);
+    } else {
+      await user.save();
+    }
 
     // หากสาขาเปลี่ยน ให้อัปเดตผลงานวิจัยทั้งหมดที่ user นี้เป็น author
     if (majorChanged) {
@@ -317,7 +323,7 @@ router.patch('/:id', async (req, res) => {
     res.json(stripVersion(user.toPublicJSON()));
   } catch (err) {
     if (err.code === 11000) return res.status(409).json({ error: 'อีเมลหรือรหัสนักศึกษาซ้ำ' });
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -327,7 +333,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
     res.json({ message: 'ลบผู้ใช้แล้ว', id: user._id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 

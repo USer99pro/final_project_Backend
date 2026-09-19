@@ -1,27 +1,33 @@
 # 🎓 Research Portal API (Backend)
 
-ระบบ RESTful API สำหรับระบบสืบค้นและจัดการผลงานวิจัยของนักศึกษาจบการศึกษา พัฒนาด้วย **Node.js (Express)** และ **MongoDB (Mongoose)** พร้อมระบบยืนยันตัวตน (JWT & Google OAuth 2.0) และระบบควบคุมสิทธิ์ผู้ใช้งานตามบทบาท (RBAC)
+ระบบ RESTful API สำหรับระบบสืบค้น จัดเก็บ และจัดการผลงานวิจัย/วิทยานิพนธ์ของนักศึกษาจบการศึกษา พัฒนาด้วย **Node.js (Express)** และ **MongoDB (Mongoose)** พร้อมระบบยืนยันตัวตน (Dual Token JWT & Google OAuth 2.0) ระบบควบคุมสิทธิ์ผู้ใช้งานตามบทบาท (RBAC) และมาตรฐานความปลอดภัยขั้นสูง (Security Hardening)
 
 ---
 
-## 🛠️ เทคโนโลยีที่ใช้ (Tech Stack)
+## 🛠️ เทคโนโลยีและเครื่องมือ (Tech Stack)
 
 - **Runtime**: Node.js (v18+)
 - **Framework**: Express.js
 - **Database**: MongoDB Atlas (Mongoose ODM)
-- **Authentication**: JWT (JSON Web Token), Passport.js (Google OAuth 2.0)
-- **File Storage**: Multer (รองรับไฟล์เอกสาร PDF)
-- **Security & Utils**: Bcrypt.js, CORS, Dotenv
+- **Authentication**: JWT (Short-lived Access Token + DB-backed Refresh Token with Token Rotation & Revocation), Passport.js (Google OAuth 2.0)
+- **Security**: 
+  - **Helmet**: ป้องกัน HTTP Header vulnerabilities
+  - **Express Rate Limit**: ป้องกัน Brute-force และ DoS ทั้งแบบ Global และ Auth Endpoints
+  - **Bcrypt**: เข้ารหัสผ่านอย่างปลอดภัย
+  - **CORS**: ควบคุม Origin ที่อนุญาต
+  - **Magic Bytes Validation**: ตรวจสอบ Header จริงของไฟล์ PDF ก่อนบันทึก ป้องกันการปลอมแปลงนามสกุลไฟล์
+  - **Error Sanitization**: ป้องกันข้อมูลภายในและ Stack Trace รั่วไหลสู่ Client
+- **File Upload**: Multer (จำกัดขนาดและประเภทไฟล์เฉพาะ `.pdf`)
 
 ---
 
-## 👥 สิทธิ์และกลุ่มผู้ใช้งาน (User Roles)
+## 👥 สิทธิ์และกลุ่มผู้ใช้งาน (User Roles & Permissions)
 
 | บทบาท (Role) | สิทธิ์การใช้งาน (Permissions) |
 | :--- | :--- |
-| **สาธารณะ (Public / Guest)** | • สืบค้นผลงานวิจัย, กรองตามสาขา/หมวดหมู่/คำสำคัญ/ปีการศึกษา<br>• ดูรายละเอียดผลงาน และดาวน์โหลดไฟล์เอกสารวิจัย (PDF) โดย**ไม่ต้องเข้าสู่ระบบ** |
-| **นักศึกษาจบการศึกษา (`graduate`)** | • สมัครสมาชิก / เข้าสู่ระบบ (Local Account & Google OAuth)<br>• จัดการผลงานวิจัยตนเอง (สร้าง, แก้ไข, ลบ, อัปโหลดเอกสาร)<br>• จัดการข้อมูลส่วนตัว และดูประวัติการใช้งาน (Activity Logs) |
-| **ผู้ดูแลระบบ (`admin`)** | • ดูสถิติรวมบน Dashboard (ยอดผู้ใช้, ผลงาน, การเข้าชม)<br>• จัดการผู้ใช้งาน (อนุมัติ, ระงับบัญชี, เปลี่ยนบทบาท, รีเซ็ตรหัสผ่าน)<br>• จัดการผลงานวิจัยทั้งหมด (อนุมัติ, เผยแพร่, ซ่อน, ลบ)<br>• จัดการข้อมูลหมวดหมู่ (Categories), แท็ก (Tags) และแผนก/สาขาวิชา (Departments)<br>• ตรวจสอบ Audit Logs, Login Logs และส่งออกรายงานสรุปเป็น CSV |
+| **สาธารณะ (Public / Guest)** | • สืบค้นผลงานวิจัย ค้นหาแบบ Full-text / กรองตาม สาขา, หมวดหมู่, คำสำคัญ, ปีการศึกษา<br>• ดูรายละเอียดผลงานวิจัย และดาวน์โหลดไฟล์เอกสารวิจัย PDF โดย**ไม่ต้องเข้าสู่ระบบ** |
+| **นักศึกษาจบการศึกษา (`graduate`)** | • สมัครสมาชิกและเข้าสู่ระบบ (Local Account & Google OAuth)<br>• จัดการผลงานวิจัยของตนเอง (สร้าง, แก้ไข, ลบ, อัปโหลดเอกสาร PDF)<br>• จัดการข้อมูลส่วนตัว และดูประวัติการเข้าใช้งาน (Activity Logs)<br>• ค้นหาและเสนอเพิ่มข้อมูลอาจารย์ที่ปรึกษา (Advisor Catalog) |
+| **ผู้ดูแลระบบ (`admin`)** | • ดูสถิติรวมบน Dashboard (ยอดผู้ใช้, ผลงาน, สถิติการดาวน์โหลดและการเข้าชม)<br>• จัดการผู้ใช้งาน (อนุมัติ, ระงับ/ปลดระงับบัญชี, เปลี่ยนบทบาท, รีเซ็ตรหัสผ่าน)<br>• จัดการผลงานวิจัยทั้งหมด (อนุมัติ, เผยแพร่, ปรับสถานะ, ลบผลงาน)<br>• จัดการ Catalog: หมวดหมู่ (Categories), แท็ก (Tags), และสาขาวิชา (Departments)<br>• ตรวจสอบ Audit Logs, Login Logs และส่งออกรายงานสรุปเป็น CSV |
 
 ---
 
@@ -33,143 +39,158 @@ npm install
 ```
 
 ### 2. ตั้งค่า Environment Variables (`.env`)
-คัดลอกและตั้งค่าในไฟล์ `.env` ที่โฟลเดอร์หลัก:
-
-```env
-PORT=3500
-MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/?appName=Cluster0
-MONGO_DB=user
-
-JWT_SECRET=your-super-secret-jwt-key
-SESSION_SECRET=your-session-secret
-
-# Google OAuth 2.0 (ตัวเลือกเพิ่มเติม)
-GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID
-GOOGLE_CLIENT_SECRET=YOUR_GOOGLE_CLIENT_SECRET
-GOOGLE_CALLBACK_URL=http://localhost:3500/api/auth/google/callback
-GOOGLE_OAUTH_ALLOWED_DOMAIN=.ac.th
-
-# Frontend URL สำหรับ Redirect หลัง OAuth Login
-FRONTEND_URL=http://localhost:5173
+คัดลอกไฟล์ตัวอย่าง `.env.example` เป็น `.env` แล้วระบุค่าคอนฟิก:
+```bash
+cp .env.example .env
 ```
 
-### 3. เตรียมฐานข้อมูลและสร้างบัญชี Admin เริ่มต้น
+```env
+PORT=3000
+MONGO_URI=mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/
+MONGO_DB=user
+MONGO_DNS_SERVERS=8.8.8.8,1.1.1.1
+
+# JWT Settings
+JWT_SECRET=your_jwt_super_secret_key_here
+ACCESS_TOKEN_EXPIRY=15m
+REFRESH_TOKEN_EXPIRY_DAYS=30
+
+# Google OAuth 2.0 (Optional)
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_CALLBACK_URL=http://localhost:3000/api/auth/google/callback
+GOOGLE_OAUTH_ALLOWED_DOMAIN=
+
+# Frontend & CORS
+FRONTEND_URL=http://localhost:5173,https://udvc-research.online
+
+# Session
+SESSION_SECRET=your_session_secret_here
+
+# Rate Limiting & Proxy
+TRUST_PROXY=1
+RATE_LIMIT_GLOBAL_MAX=1000
+RATE_LIMIT_AUTH_MAX=30
+```
+
+### 3. เตรียมฐานข้อมูลและสร้างบัญชี Admin เริ่มต้น (Database Seeding)
 ```bash
 npm run init:db
 ```
-*ระบบจะสร้าง Collections, Indexes, Catalog เริ่มต้น และสร้างบัญชี Admin (`admin@example.com` / `admin123456`) ให้โดยอัตโนมัติ*
+*ระบบจะสร้าง Collections, Indexes ที่จำเป็น และสร้างบัญชี Admin เริ่มต้น (`admin@example.com` / `admin123456`)*
 
 ### 4. รันระบบ Backend Server
 ```bash
-# โหมดพัฒนา (Development)
+# โหมดพัฒนา (Development with Nodemon)
 npm run dev
 
-# โหมดทำงานจริง (Production)
+# โหมด Production
 npm start
 ```
-ระบบจะทำงานที่: `http://localhost:3500`
+เซิร์ฟเวอร์จะเริ่มทำงานที่: `http://localhost:3000` (หรือ Port ที่ระบุใน `.env`)
 
 ---
 
 ## 📌 สรุปเส้นทาง API (API Endpoints Summary)
 
-### 🌐 Public APIs (ไม่ต้องมี Token)
-- `GET /health` — เช็คสถานะการทำงานของ Server
-- `GET /api/public/projects` — ค้นหาและกรองรายการผลงานวิจัย (`?q=`, `title`, `researcher`, `categoryName`, `keyword`, `major`, `academicYear`, `page`, `limit`)
+### 🌐 1. Public APIs (ไม่ต้องเข้าสู่ระบบ)
+- `GET /health` — ตรวจสอบสถานะการทำงานของ Server และ DB Connection
+- `GET /api/public/projects` — ค้นหาและกรองรายการผลงานวิจัย (`?q=`, `title`, `categoryName`, `keyword`, `major`, `academicYear`, `page`, `limit`)
 - `GET /api/public/projects/:id` — ดูรายละเอียดผลงานวิจัยตาม ID
-- `GET /api/public/projects/:id/file` — ดาวน์โหลดไฟล์เอกสารวิจัย PDF (`?download=1`)
-- `GET /api/public/categories` — ดึงรายการหมวดหมู่ผลงาน
-- `GET /api/public/tags` — ดึงรายการแท็ก/คำสำคัญ
-- `GET /api/departments` — ดึงรายการแผนก/สาขาวิชาพร้อมหมวดหมู่และแท็กที่เกี่ยวข้อง
+- `GET /api/public/projects/:id/file` — สตรีมหรือดาวน์โหลดไฟล์เอกสารวิจัย PDF (`?download=1`)
+- `GET /api/public/categories` — รายการหมวดหมู่ผลงานทั้งหมด
+- `GET /api/public/tags` — รายการแท็ก/คำสำคัญทั้งหมด
+- `GET /api/departments` — รายการแผนก/สาขาวิชาพร้อมหมวดหมู่และแท็กที่เกี่ยวข้อง
 
 ---
 
-### 🔐 Auth APIs (การยืนยันตัวตน)
-- `POST /api/auth/register` — สมัครสมาชิกสำหรับนักศึกษาจบการศึกษา (`studentId`, `fullName`, `major`, `email`, `password`)
-- `POST /api/auth/login` — เข้าสู่ระบบด้วย Email และ Password
-- `GET /api/auth/me` — ดึงข้อมูลโปรไฟล์ผู้ใช้ปัจจุบัน (ใช้ JWT Bearer Token)
-- `GET /api/auth/google` — เข้าสู่ระบบด้วย Google OAuth 2.0
-- `GET /api/auth/google/callback` — Callback สำหรับ Google OAuth
+### 🔐 2. Auth APIs (การยืนยันตัวตน)
+- `POST /api/auth/register` — สมัครสมาชิกสำหรับนักศึกษา (`studentId`, `fullName`, `major`, `email`, `password`)
+- `POST /api/auth/login` — เข้าสู่ระบบด้วย Email/Password (รับ `accessToken` และ `refreshToken`)
+- `POST /api/auth/refresh` — ขอ `accessToken` ใหม่ด้วย `refreshToken`
+- `POST /api/auth/logout` — ยกเลิก `refreshToken` (Logout)
+- `GET /api/auth/me` — ข้อมูลผู้ใช้ปัจจุบัน (ใช้ Access Token)
+- `GET /api/auth/google` — ลิงก์เข้าสู่ระบบผ่าน Google OAuth 2.0
+- `GET /api/auth/google/callback` — OAuth Callback Endpoint
 
 ---
 
-### 🎓 Graduate APIs (สำหรับนักศึกษาจบการศึกษา)
-*(ต้องแนบ `Authorization: Bearer <TOKEN>`)*
+### 🎓 3. Graduate / User APIs (สำหรับนักศึกษาและผู้ใช้ที่เข้าสู่ระบบ)
+*(ต้องแนบ Header `Authorization: Bearer <ACCESS_TOKEN>`)*
 
-- `GET /api/me/works` — ดึงรายการผลงานวิจัยของตนเอง
-- `GET /api/me/activity` — ดึงประวัติการเข้าใช้งานและกิจกรรมของตนเอง
-- `GET /api/me/advisors` — ดึงรายการอาจารย์ที่ปรึกษาในผลงานของตนเอง
-- `GET /api/users/advisors` — ดึงรายการและค้นหาอาจารย์ที่ปรึกษาสำหรับผู้ใช้งาน (`?q=`, `major`, `department`, `expertise`, `page`, `limit`)
-- `GET /api/users/advisors/:id` — ดูรายละเอียดข้อมูลอาจารย์ที่ปรึกษาตาม ID
-- `POST /api/users/advisors` หรือ `POST /api/advisors` — เพิ่มข้อมูลอาจารย์ที่ปรึกษาใหม่ (มีการตรวจสอบชื่อและตำแหน่งทางวิชาการซ้ำก่อนเพิ่ม)
-- `GET /api/contents` — ดึงรายการผลงาน
-- `POST /api/contents` — สร้างผลงานวิจัยใหม่
-- `GET /api/contents/:id` — ดูรายละเอียดผลงานตาม ID
-- `PATCH /api/contents/:id` — แก้ไขข้อมูลผลงานวิจัยของตนเอง
-- `DELETE /api/contents/:id` — ลบผลงานวิจัยของตนเอง
-- `POST /api/uploads/paper` — อัปโหลดไฟล์เอกสาร PDF
-- `PATCH /api/users/:id` — อัปเดตข้อมูลโปรไฟล์ส่วนตัว
+- **ผลงานวิจัยส่วนตัว**
+  - `GET /api/me/works` — ดึงรายการผลงานวิจัยของตนเอง
+  - `GET /api/me/activity` — ดึงประวัติการเข้าใช้งานและกิจกรรมของตนเอง
+  - `GET /api/me/advisors` — ดึงรายชื่ออาจารย์ที่ปรึกษาในผลงานของตนเอง
+  - `POST /api/contents` — สร้างผลงานวิจัยใหม่
+  - `GET /api/contents/:id` — ดูรายละเอียดผลงานวิจัย
+  - `PATCH /api/contents/:id` — แก้ไขข้อมูลผลงานวิจัยตนเอง
+  - `DELETE /api/contents/:id` — ลบผลงานวิจัยตนเอง
+  - `POST /api/uploads/paper` — อัปโหลดไฟล์เอกสาร PDF (มี Header Magic Byte Validation)
+- **อาจารย์ที่ปรึกษา**
+  - `GET /api/users/advisors` — ค้นหาและดูรายชื่ออาจารย์ที่ปรึกษา
+  - `GET /api/users/advisors/:id` — ดูรายละเอียดอาจารย์ที่ปรึกษาตาม ID
+  - `POST /api/users/advisors` — เพิ่มข้อมูลอาจารย์ที่ปรึกษาใหม่เข้าสู่ระบบ (ตรวจสอบชื่อซ้ำ)
+- **จัดการโปรไฟล์**
+  - `PATCH /api/users/:id` — อัปเดตข้อมูลส่วนตัว / เปลี่ยนรหัสผ่าน (ยกเลิก token เก่าอัตโนมัติ)
 
 ---
 
-### 👑 Admin APIs (สำหรับผู้ดูแลระบบ)
-*(ต้องแนบ `Authorization: Bearer <TOKEN>` ของผู้ใช้สิทธิ์ `admin`)*
+### 👑 4. Admin APIs (สำหรับผู้ดูแลระบบ)
+*(ต้องแนบ Header `Authorization: Bearer <ADMIN_ACCESS_TOKEN>`)*
 
 - **Dashboard & สถิติ**
-  - `GET /api/admin/dashboard` — สถิติภาพรวมระบบ (ยอดผู้ใช้, ผลงานวิจัย, การเข้าชม)
+  - `GET /api/admin/dashboard` — สถิติภาพรวมระบบ (ยอดผู้ใช้, ผลงานวิจัย, ยอดเข้าชม)
 - **จัดการผู้ใช้งาน**
-  - `GET /api/admin/users` — ดึงรายการผู้ใช้ทั้งหมด
-  - `PATCH /api/admin/users/:id/suspend` — ระงับการใช้งานบัญชีผู้ใช้
-  - `PATCH /api/admin/users/:id/activate` — ปลดระงับบัญชีผู้ใช้
+  - `GET /api/admin/users` — รายการผู้ใช้ทั้งหมดในระบบ
+  - `POST /api/users` — สร้างผู้ใช้งานใหม่โดย Admin
+  - `PATCH /api/admin/users/:id/suspend` — ระงับการใช้งานบัญชี
+  - `PATCH /api/admin/users/:id/activate` — ปลดการระงับบัญชี
   - `PATCH /api/admin/users/:id/role` — เปลี่ยนบทบาทผู้ใช้ (`graduate` / `admin`)
-  - `POST /api/admin/users/:id/reset-password` — รีเซ็ตรหัสผ่านผู้ใช้งาน
+  - `POST /api/admin/users/:id/reset-password` — บังคับรีเซ็ตรหัสผ่านผู้ใช้
+  - `DELETE /api/users/:id` — ลบผู้ใช้ออกจากระบบ
 - **จัดการผลงานวิจัย**
-  - `GET /api/admin/works` — รายการผลงานวิจัยทั้งหมดในระบบ (พร้อมสถานะการอนุมัติ)
-  - `PATCH /api/admin/works/:id` — อนุมัติ / แก้ไขสถานะ / จัดการผลงาน
-  - `DELETE /api/admin/works/:id` — ลบผลงานวิจัยออกจากระบบ
-- **จัดการหมวดหมู่, แท็ก และสาขาวิชา**
+  - `GET /api/admin/works` — รายการผลงานวิจัยทั้งหมดในระบบ
+  - `PATCH /api/admin/works/:id` — อนุมัติ / ปรับสถานะ / แก้ไขผลงาน
+  - `DELETE /api/admin/works/:id` — ลบผลงานวิจัย
+- **จัดการ Catalog & สาขา**
   - `GET / POST / PATCH / DELETE /api/categories` — จัดการหมวดหมู่ผลงาน
   - `GET / POST / PATCH / DELETE /api/tags` — จัดการแท็กคำสำคัญ
   - `GET / POST / PATCH / DELETE /api/departments` — จัดการสาขาวิชาและคณะ
-- **Logs & รายงาน**
-  - `GET /api/admin/audit-logs` — ตรวจสอบ Audit Logs การทำงานในระบบ
-  - `GET /api/admin/login-logs` — ตรวจสอบประวัติการเข้าสู่ระบบ
-  - `GET /api/admin/reports/summary` — รายงานสรุปภาพรวม
-  - `GET /api/admin/reports/export.csv` — ส่งออกข้อมูลรายงานเป็นไฟล์ CSV
+- **Audit & Reports**
+  - `GET /api/admin/audit-logs` — ประวัติ Audit Logs การกระทำในระบบ
+  - `GET /api/admin/login-logs` — ประวัติ Login Logs
+  - `GET /api/admin/reports/summary` — สรุปข้อมูลรายงาน
+  - `GET /api/admin/reports/export.csv` — ส่งออกรายงานในรูปแบบ CSV
 
 ---
 
-## 🧪 คำสั่งสคริปต์ที่มีให้ใช้งาน (NPM Scripts)
+## 🧪 คำสั่งสคริปต์ (NPM Scripts)
 
-```bash
-# เริ่มต้นทำงานในโหมด Development
-npm run dev
-
-# สร้างโครงสร้าง DB และสร้างบัญชี Admin เริ่มต้น
-npm run init:db
-
-# ทดสอบรันการทำงานของ API ต่างๆ
-npm run test:api
-
-# ย้ายบทบาทผู้ใช้งานในระบบ (Migration)
-npm run migrate:roles
-```
+| คำสั่ง | รายละเอียด |
+| :--- | :--- |
+| `npm run dev` | เริ่มต้นเซิร์ฟเวอร์ในโหมด Development ด้วย `nodemon` |
+| `npm start` | เริ่มต้นเซิร์ฟเวอร์ในโหมด Production |
+| `npm run init:db` | รัน Seeding สร้างโครงสร้าง DB, Collections, Indexes และ Admin เริ่มต้น |
+| `npm run test:api` | รันชุดทดสอบ API ตรวจสอบการทำงานของระบบ |
+| `npm run migrate:roles` | ย้ายและปรับโครงสร้างบทบาท (Roles Migration) |
 
 ---
 
-## 📂 โครงสร้างโฟลเดอร์ (Project Structure)
+## 📂 โครงสร้างโปรเจกต์ (Project Structure)
 
 ```text
 final_project_Backend/
-├── config/             # การตั้งค่าระบบ (เช่น การเชื่อมต่อ MongoDB db.js)
-├── middleware/         # Custom Express Middlewares (Auth, Passport, Upload PDF)
-├── models/             # Mongoose Schemas & Models (User, Content, Tag, Category, etc.)
-├── routes/             # Express Route Handlers (Auth, Public, Contents, Admin, etc.)
-├── scripts/            # Database Seeding, Tests & Migration Utility Scripts
-├── uploads/            # โฟลเดอร์เก็บไฟล์ PDF เอกสารวิจัยที่อัปโหลด
-├── utils/              # Helper utilities (Audit logs, Paths, Serializers)
-├── .env                # Environment variables file
-├── package.json        # Dependencies & NPM Scripts
-└── server.js           # Entry point ของแอปพลิเคชัน Express
+├── config/             # การเชื่อมต่อฐานข้อมูล MongoDB (db.js)
+├── middleware/         # Middlewares (auth.js, uploadPdf.js, rateLimiter, passport.js)
+├── models/             # Mongoose Schemas & Models (User, Content, Tag, Category, Advisor, etc.)
+├── routes/             # Express API Routes (auth, public, me, contents, users, admin, etc.)
+├── scripts/            # Database Seeding, Migration, และ Automated Test Scripts
+├── uploads/            # ที่จัดเก็บไฟล์เอกสารวิจัย PDF (uploads/pdfs/)
+├── utils/              # ฟังก์ชันเสริม (auditLog, sendError, serialize, searchFilter, sanitize)
+├── .env.example        # ไฟล์ตัวอย่าง Environment Variables
+├── .gitignore          # ไฟล์ Git Ignore
+├── package.json        # Dependencies และคำสั่งสคริปต์
+├── render.yaml         # การตั้งค่าสำหรับ Deploy บน Render
+└── server.js           # Main Entry Point ของ Express Application
 ```
-

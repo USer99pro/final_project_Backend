@@ -23,6 +23,23 @@ const advisorsRouter = require('./routes/advisors');
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 
+// F7: Fail fast if SESSION_SECRET is absent or is still the well-known default.
+// A weak session secret allows OAuth state-parameter forgery.
+const _SESSION_SECRET = process.env.SESSION_SECRET;
+const _SESSION_SECRET_DEFAULTS = new Set([
+  'change-this-session-secret',
+  'change-this-session-secret-to-something-random',
+  '',
+  undefined,
+]);
+if (IS_PROD && (!_SESSION_SECRET || _SESSION_SECRET_DEFAULTS.has(_SESSION_SECRET))) {
+  console.error(
+    '[FATAL] SESSION_SECRET is missing or is still the default placeholder in production. ' +
+    'Set a strong random value in your .env file.'
+  );
+  process.exit(1);
+}
+
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -69,14 +86,13 @@ const ALLOWED_ORIGINS = Array.from(new Set([...expandedOrigins, ...defaultOrigin
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow non-browser requests (Postman, server-to-server) or matched origins
+      // Allow non-browser requests (Postman, server-to-server) or matched origins.
+      // F5: Removed wildcard .vercel.app / .onrender.com fallback — add specific
+      // deployment subdomains to FRONTEND_URL in .env instead.
       if (!origin) return callback(null, true);
       const cleanOrigin = origin.replace(/\/$/, '');
       const isAllowedDomain =
-        ALLOWED_ORIGINS.includes(cleanOrigin) ||
-        !IS_PROD ||
-        cleanOrigin.endsWith('.vercel.app') ||
-        cleanOrigin.endsWith('.onrender.com');
+        ALLOWED_ORIGINS.includes(cleanOrigin) || !IS_PROD;
 
       if (isAllowedDomain) {
         return callback(null, true);
@@ -100,7 +116,7 @@ app.use(
     secret: process.env.SESSION_SECRET || 'change-this-session-secret',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 10 * 60 * 1000 }, // 10 min â€” only for OAuth handshake
+    cookie: { secure: IS_PROD, httpOnly: true, sameSite: 'lax', maxAge: 10 * 60 * 1000 }, // 10 min - only for OAuth handshake (httpOnly+sameSite added)
   })
 );
 app.use(passport.initialize());
