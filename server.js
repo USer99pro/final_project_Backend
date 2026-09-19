@@ -10,6 +10,8 @@ const { globalLimiter, authLimiter, analyticsLimiter } = require('./middleware/r
 const analyticsTrackRouter = require('./routes/analyticsTrack');
 const { connectDB } = require('./config/db');
 const authRouter = require('./routes/auth');
+const { toNodeHandler } = require('better-auth/node');
+const { auth: betterAuthInstance } = require('./lib/auth');
 const usersRouter = require('./routes/users');
 const contentsRouter = require('./routes/contents');
 const tagsRouter = require('./routes/tags');
@@ -128,6 +130,9 @@ app.use('/api/public', publicRouter);
 // Analytics tracking — public endpoint (rate-limited, validated, no auth required)
 app.use('/api/analytics', analyticsLimiter, analyticsTrackRouter);
 // Auth routes get a stricter rate limit (20 req / 15 min per IP)
+// Better Auth routes (coexists alongside legacy auth routes, rate-limited)
+app.all('/api/auth/better/*', authLimiter, toNodeHandler(betterAuthInstance));
+
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/contents', contentsRouter);
