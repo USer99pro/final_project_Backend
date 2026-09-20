@@ -10,21 +10,29 @@ if (process.env.MONGO_DNS_SERVERS) {
   }
 }
 
+let cachedConnection = null;
+
 async function connectDB() {
   if (mongoose.connection.readyState >= 1) {
     return mongoose.connection;
   }
 
-  const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/user';
-  const dbName = process.env.MONGO_DB || 'user';
-
-  const opts = {
-    dbName,
-  };
+  if (!cachedConnection) {
+    const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/user';
+    const dbName = process.env.MONGO_DB || 'user';
+    const opts = {
+      dbName,
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+    };
+    cachedConnection = mongoose.connect(uri, opts).catch((err) => {
+      cachedConnection = null;
+      throw err;
+    });
+  }
 
   try {
-    const conn = await mongoose.connect(uri, opts);
-    isConnected = true;
+    const conn = await cachedConnection;
     console.log(`🍃 MongoDB Connected: ${conn.connection.host} / ${conn.connection.name}`);
     return conn.connection;
   } catch (error) {

@@ -181,6 +181,7 @@ npm start
 
 ```text
 final_project_Backend/
+├── api/                # Vercel Serverless Function Entrypoint (index.js)
 ├── config/             # การเชื่อมต่อฐานข้อมูล MongoDB (db.js)
 ├── middleware/         # Middlewares (auth.js, uploadPdf.js, rateLimiter, passport.js)
 ├── models/             # Mongoose Schemas & Models (User, Content, Tag, Category, Advisor, etc.)
@@ -191,6 +192,6 @@ final_project_Backend/
 ├── .env.example        # ไฟล์ตัวอย่าง Environment Variables
 ├── .gitignore          # ไฟล์ Git Ignore
 ├── package.json        # Dependencies และคำสั่งสคริปต์
-├── render.yaml         # การตั้งค่าสำหรับ Deploy บน Render
-└── server.js           # Main Entry Point ของ Express Application
+├── vercel.json         # การตั้งค่าสำหรับ Deploy บน Vercel Serverless
+└── server.js           # Main Express Application & Route Setup
 ```
