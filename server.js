@@ -1,4 +1,5 @@
 require('dotenv').config();
+try { require('dotenv').config({ path: require('path').resolve(process.cwd(), '.env.local') }); } catch (_) {}
 const path = require('path');
 const express = require('express');
 const cors = require('cors');

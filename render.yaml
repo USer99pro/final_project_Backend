@@ -18,5 +18,9 @@ services:
         generateValue: true
       - key: SESSION_SECRET
         generateValue: true
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+      - key: BETTER_AUTH_URL
+        sync: false
       - key: FRONTEND_URL
         sync: false
