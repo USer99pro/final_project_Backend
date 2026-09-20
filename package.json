@@ -10,7 +10,7 @@
     "default": "npm run dev"
   },
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
