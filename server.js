@@ -11,8 +11,7 @@ const { globalLimiter, authLimiter, analyticsLimiter } = require('./middleware/r
 const analyticsTrackRouter = require('./routes/analyticsTrack');
 const { connectDB } = require('./config/db');
 const authRouter = require('./routes/auth');
-const { toNodeHandler } = require('better-auth/node');
-const { auth: betterAuthInstance } = require('./lib/auth');
+const { getAuth } = require('./lib/auth');
 const usersRouter = require('./routes/users');
 const contentsRouter = require('./routes/contents');
 const tagsRouter = require('./routes/tags');
@@ -132,7 +131,22 @@ app.use('/api/public', publicRouter);
 app.use('/api/analytics', analyticsLimiter, analyticsTrackRouter);
 // Auth routes get a stricter rate limit (20 req / 15 min per IP)
 // Better Auth routes (coexists alongside legacy auth routes, rate-limited)
-app.all('/api/auth/better/*', authLimiter, toNodeHandler(betterAuthInstance));
+// better-auth ships ESM-only; toNodeHandler is loaded via dynamic import()
+let _betterAuthHandler = null;
+app.all('/api/auth/better/*', authLimiter, async (req, res, next) => {
+  try {
+    if (!_betterAuthHandler) {
+      const [{ toNodeHandler }, authInstance] = await Promise.all([
+        import('better-auth/node'),
+        getAuth(),
+      ]);
+      _betterAuthHandler = toNodeHandler(authInstance);
+    }
+    return _betterAuthHandler(req, res);
+  } catch (err) {
+    next(err);
+  }
+});
 
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/users', usersRouter);
