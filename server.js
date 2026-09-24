@@ -105,6 +105,14 @@ app.use(
   })
 );
 
+// Prevent cross-origin cache pollution (e.g. browser caching www response and serving to non-www)
+app.use('/api', (req, res, next) => {
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  next();
+});
+
 // â”€â”€ Global rate limit (100 req / 15 min per IP) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.use(globalLimiter);
 
