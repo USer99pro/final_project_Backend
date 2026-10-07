@@ -8,6 +8,8 @@ const { authenticate, requireAdmin, requireGraduate, revokeAllUserTokens } = req
 const { stripVersion } = require('../utils/serialize');
 const { escapeRegex } = require('../utils/searchFilter');
 const { sendError } = require('../utils/sendError');
+const { uploadSpreadsheet } = require('../middleware/uploadSpreadsheet');
+const { processUserImport, generateImportTemplate } = require('../utils/userImport');
 
 const router = express.Router();
 
@@ -228,6 +230,45 @@ router.get('/:id', async (req, res) => {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
     res.json(stripVersion(user.toPublicJSON()));
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+/**
+ * GET /api/users/import-template
+ * ดาวน์โหลดแม่แบบไฟล์สำหรับนำเข้าผู้ใช้ (CSV หรือ XLSX)
+ */
+router.get('/import-template', requireAdmin, (req, res) => {
+  try {
+    const format = req.query.format === 'csv' ? 'csv' : 'xlsx';
+    const { buffer, filename, mimeType } = generateImportTemplate(format);
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(buffer);
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+/**
+ * POST /api/users/import
+ * นำเข้าผู้ใช้งานจำนวนมากผ่านไฟล์ CSV หรือ Excel (.xlsx / .xls)
+ */
+router.post('/import', requireAdmin, uploadSpreadsheet.single('file'), async (req, res) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ error: 'กรุณาแนบไฟล์ spreadsheet (.csv, .xlsx, .xls) ในฟิลด์ "file"' });
+    }
+
+    const dryRun = req.query.dryRun === 'true' || req.body.dryRun === 'true' || req.body.dryRun === true;
+    const result = await processUserImport(req.file.buffer, {
+      dryRun,
+      req,
+      adminUser: req.user,
+    });
+
+    return res.status(200).json(result);
   } catch (err) {
     return sendError(res, err);
   }

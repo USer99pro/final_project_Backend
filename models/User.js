@@ -4,15 +4,15 @@ const bcrypt = require('bcrypt');
 const userSchema = new mongoose.Schema(
   {
     studentId: { type: String, trim: true, sparse: true, unique: true },
+    citizenId: { type: String, trim: true, sparse: true },
     fullName: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    password: { type: String, minlength: 6, select: false }, // optional — Google OAuth users have no local password
+    password: { type: String, required: true, minlength: 6, select: false },
     major: { type: String, trim: true, default: '' },
     phone: { type: String, trim: true, default: '' },
     role: { type: String, enum: ['graduate', 'admin', 'user'], default: 'graduate' },
     isActive: { type: Boolean, default: true },
-    googleId: { type: String, sparse: true, unique: true },          // Google OAuth subject ID
-    authProvider: { type: String, enum: ['local', 'google'], default: 'local' },
+    authProvider: { type: String, default: 'local' },
     tokenVersion: { type: Number, default: 0 },                      // Increment to revoke all JWTs instantly
     resetPasswordToken: { type: String, select: false },
     resetPasswordExpires: { type: Date, select: false },

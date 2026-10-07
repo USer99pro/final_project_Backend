@@ -4,8 +4,6 @@ const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
-const session = require('express-session');
-const passport = require('./middleware/passport');
 const { securityHeaders, permissionsPolicy } = require('./middleware/securityHeaders');
 const { globalLimiter, authLimiter, analyticsLimiter } = require('./middleware/rateLimiter');
 const analyticsTrackRouter = require('./routes/analyticsTrack');
@@ -24,23 +22,6 @@ const adminRouter = require('./routes/admin');
 const advisorsRouter = require('./routes/advisors');
 
 const IS_PROD = process.env.NODE_ENV === 'production';
-
-// F7: Fail fast if SESSION_SECRET is absent or is still the well-known default.
-// A weak session secret allows OAuth state-parameter forgery.
-const _SESSION_SECRET = process.env.SESSION_SECRET;
-const _SESSION_SECRET_DEFAULTS = new Set([
-  'change-this-session-secret',
-  'change-this-session-secret-to-something-random',
-  '',
-  undefined,
-]);
-if (IS_PROD && (!_SESSION_SECRET || _SESSION_SECRET_DEFAULTS.has(_SESSION_SECRET))) {
-  console.error(
-    '[FATAL] SESSION_SECRET is missing or is still the default placeholder in production. ' +
-    'Set a strong random value in your .env file.'
-  );
-  process.exit(1);
-}
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -120,18 +101,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// â”€â”€ Session (required by Passport for OAuth state parameter) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || 'change-this-session-secret',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { secure: IS_PROD, httpOnly: true, sameSite: 'lax', maxAge: 10 * 60 * 1000 }, // 10 min - only for OAuth handshake (httpOnly+sameSite added)
-  })
-);
-app.use(passport.initialize());
-app.use(passport.session());
-
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 app.use('/api/public', publicRouter);
@@ -207,7 +176,6 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
       const server = app.listen(PORT, () => {
         console.log(`âœ… API ready â†’ http://localhost:${PORT}`);
         console.log(`   JWT expiry    : 30 days`);
-        console.log(`   Google OAuth  : ${process.env.GOOGLE_CLIENT_ID ? 'configured âœ“' : 'âš  GOOGLE_CLIENT_ID not set'}`);
       });
 
       server.on('error', (err) => {

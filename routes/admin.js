@@ -11,6 +11,8 @@ const Category = require('../models/Category');
 const PdfFile = require('../models/PdfFile');
 const { authenticate, requireAdmin, revokeAllUserTokens } = require('../middleware/auth');
 const { uploadPdf, uploadDir, verifyPdfMagic } = require('../middleware/uploadPdf');
+const { uploadSpreadsheet } = require('../middleware/uploadSpreadsheet');
+const { processUserImport, generateImportTemplate } = require('../utils/userImport');
 const { logAudit } = require('../utils/audit');
 const { logActivity } = require('../utils/activity');
 const { stripVersion } = require('../utils/serialize');
@@ -238,6 +240,45 @@ router.post('/users/:id/reset-password', async (req, res) => {
       req,
     });
     res.json({ message: `รีเซ็ตรหัสผ่านสำเร็จ (${user.fullName}) — ผู้ใช้ต้องเข้าสู่ระบบใหม่` });
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+/**
+ * GET /api/admin/users/import-template
+ * ดาวน์โหลดแม่แบบไฟล์สำหรับนำเข้าผู้ใช้ (CSV หรือ XLSX)
+ */
+router.get('/users/import-template', (req, res) => {
+  try {
+    const format = req.query.format === 'csv' ? 'csv' : 'xlsx';
+    const { buffer, filename, mimeType } = generateImportTemplate(format);
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(buffer);
+  } catch (err) {
+    return sendError(res, err);
+  }
+});
+
+/**
+ * POST /api/admin/users/import
+ * นำเข้าผู้ใช้งานจำนวนมากผ่านไฟล์ CSV หรือ Excel (.xlsx / .xls)
+ */
+router.post('/users/import', uploadSpreadsheet.single('file'), async (req, res) => {
+  try {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ error: 'กรุณาแนบไฟล์ spreadsheet (.csv, .xlsx, .xls) ในฟิลด์ "file"' });
+    }
+
+    const dryRun = req.query.dryRun === 'true' || req.body.dryRun === 'true' || req.body.dryRun === true;
+    const result = await processUserImport(req.file.buffer, {
+      dryRun,
+      req,
+      adminUser: req.user,
+    });
+
+    return res.status(200).json(result);
   } catch (err) {
     return sendError(res, err);
   }

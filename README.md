@@ -1,6 +1,6 @@
 # 🎓 Research Portal API (Backend)
 
-ระบบ RESTful API สำหรับระบบสืบค้น จัดเก็บ และจัดการผลงานวิจัย/วิทยานิพนธ์ของนักศึกษาจบการศึกษา พัฒนาด้วย **Node.js (Express)** และ **MongoDB (Mongoose)** พร้อมระบบยืนยันตัวตน (Dual Token JWT & Google OAuth 2.0) ระบบควบคุมสิทธิ์ผู้ใช้งานตามบทบาท (RBAC) และมาตรฐานความปลอดภัยขั้นสูง (Security Hardening)
+ระบบ RESTful API สำหรับระบบสืบค้น จัดเก็บ และจัดการผลงานวิจัย/วิทยานิพนธ์ของนักศึกษาจบการศึกษา พัฒนาด้วย **Node.js (Express)** และ **MongoDB (Mongoose)** พร้อมระบบยืนยันตัวตน (Dual Token JWT) ระบบควบคุมสิทธิ์ผู้ใช้งานตามบทบาท (RBAC) และมาตรฐานความปลอดภัยขั้นสูง (Security Hardening)
 
 ---
 
@@ -9,7 +9,8 @@
 - **Runtime**: Node.js (v18+)
 - **Framework**: Express.js
 - **Database**: MongoDB Atlas (Mongoose ODM)
-- **Authentication**: JWT (Short-lived Access Token + DB-backed Refresh Token with Token Rotation & Revocation), Passport.js (Google OAuth 2.0)
+- **Authentication**: JWT (Short-lived Access Token + DB-backed Refresh Token with Token Rotation & Revocation)
+- **Spreadsheet & Bulk Import**: XLSX (SheetJS) สำหรับอ่าน/เขียนและนำเข้าข้อมูลผู้ใช้จาก CSV และ Excel (.xlsx, .xls)
 - **Security**: 
   - **Helmet**: ป้องกัน HTTP Header vulnerabilities
   - **Express Rate Limit**: ป้องกัน Brute-force และ DoS ทั้งแบบ Global และ Auth Endpoints
@@ -26,7 +27,7 @@
 | บทบาท (Role) | สิทธิ์การใช้งาน (Permissions) |
 | :--- | :--- |
 | **สาธารณะ (Public / Guest)** | • สืบค้นผลงานวิจัย ค้นหาแบบ Full-text / กรองตาม สาขา, หมวดหมู่, คำสำคัญ, ปีการศึกษา<br>• ดูรายละเอียดผลงานวิจัย และดาวน์โหลดไฟล์เอกสารวิจัย PDF โดย**ไม่ต้องเข้าสู่ระบบ** |
-| **นักศึกษาจบการศึกษา (`graduate`)** | • สมัครสมาชิกและเข้าสู่ระบบ (Local Account & Google OAuth)<br>• จัดการผลงานวิจัยของตนเอง (สร้าง, แก้ไข, ลบ, อัปโหลดเอกสาร PDF)<br>• จัดการข้อมูลส่วนตัว และดูประวัติการเข้าใช้งาน (Activity Logs)<br>• ค้นหาและเสนอเพิ่มข้อมูลอาจารย์ที่ปรึกษา (Advisor Catalog) |
+| **นักศึกษาจบการศึกษา (`graduate`)** | • สมัครสมาชิกและเข้าสู่ระบบ (Local Account)<br>• จัดการผลงานวิจัยของตนเอง (สร้าง, แก้ไข, ลบ, อัปโหลดเอกสาร PDF)<br>• จัดการข้อมูลส่วนตัว และดูประวัติการเข้าใช้งาน (Activity Logs)<br>• ค้นหาและเสนอเพิ่มข้อมูลอาจารย์ที่ปรึกษา (Advisor Catalog) |
 | **ผู้ดูแลระบบ (`admin`)** | • ดูสถิติรวมบน Dashboard (ยอดผู้ใช้, ผลงาน, สถิติการดาวน์โหลดและการเข้าชม)<br>• จัดการผู้ใช้งาน (อนุมัติ, ระงับ/ปลดระงับบัญชี, เปลี่ยนบทบาท, รีเซ็ตรหัสผ่าน)<br>• จัดการผลงานวิจัยทั้งหมด (อนุมัติ, เผยแพร่, ปรับสถานะ, ลบผลงาน)<br>• จัดการ Catalog: หมวดหมู่ (Categories), แท็ก (Tags), และสาขาวิชา (Departments)<br>• ตรวจสอบ Audit Logs, Login Logs และส่งออกรายงานสรุปเป็น CSV |
 
 ---
@@ -55,17 +56,8 @@ JWT_SECRET=your_jwt_super_secret_key_here
 ACCESS_TOKEN_EXPIRY=15m
 REFRESH_TOKEN_EXPIRY_DAYS=30
 
-# Google OAuth 2.0 (Optional)
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-GOOGLE_CALLBACK_URL=http://localhost:3000/api/auth/google/callback
-GOOGLE_OAUTH_ALLOWED_DOMAIN=
-
 # Frontend & CORS
 FRONTEND_URL=http://localhost:5173,https://udvc-research.online
-
-# Session
-SESSION_SECRET=your_session_secret_here
 
 # Rate Limiting & Proxy
 TRUST_PROXY=1
@@ -110,8 +102,6 @@ npm start
 - `POST /api/auth/refresh` — ขอ `accessToken` ใหม่ด้วย `refreshToken`
 - `POST /api/auth/logout` — ยกเลิก `refreshToken` (Logout)
 - `GET /api/auth/me` — ข้อมูลผู้ใช้ปัจจุบัน (ใช้ Access Token)
-- `GET /api/auth/google` — ลิงก์เข้าสู่ระบบผ่าน Google OAuth 2.0
-- `GET /api/auth/google/callback` — OAuth Callback Endpoint
 
 ---
 
@@ -143,7 +133,9 @@ npm start
   - `GET /api/admin/dashboard` — สถิติภาพรวมระบบ (ยอดผู้ใช้, ผลงานวิจัย, ยอดเข้าชม)
 - **จัดการผู้ใช้งาน**
   - `GET /api/admin/users` — รายการผู้ใช้ทั้งหมดในระบบ
-  - `POST /api/users` — สร้างผู้ใช้งานใหม่โดย Admin
+  - `POST /api/users` — สร้างผู้ใช้งานใหม่ทีละบัญชีโดย Admin
+  - `POST /api/admin/users/import` (หรือ `POST /api/users/import`) — นำเข้าผู้ใช้จำนวนมากผ่านไฟล์ CSV หรือ Excel (`.xlsx`, `.xls`) พร้อมระบบข้ามรายการซ้ำและรายงานผลสรุป
+  - `GET /api/admin/users/import-template` (หรือ `GET /api/users/import-template`) — ดาวน์โหลดแม่แบบไฟล์ CSV หรือ Excel สำหรับนำเข้าผู้ใช้งาน (`?format=xlsx` หรือ `?format=csv`)
   - `PATCH /api/admin/users/:id/suspend` — ระงับการใช้งานบัญชี
   - `PATCH /api/admin/users/:id/activate` — ปลดการระงับบัญชี
   - `PATCH /api/admin/users/:id/role` — เปลี่ยนบทบาทผู้ใช้ (`graduate` / `admin`)
@@ -183,12 +175,12 @@ npm start
 final_project_Backend/
 ├── api/                # Vercel Serverless Function Entrypoint (index.js)
 ├── config/             # การเชื่อมต่อฐานข้อมูล MongoDB (db.js)
-├── middleware/         # Middlewares (auth.js, uploadPdf.js, rateLimiter, passport.js)
+├── middleware/         # Middlewares (auth.js, uploadPdf.js, uploadSpreadsheet.js, rateLimiter.js)
 ├── models/             # Mongoose Schemas & Models (User, Content, Tag, Category, Advisor, etc.)
 ├── routes/             # Express API Routes (auth, public, me, contents, users, admin, etc.)
 ├── scripts/            # Database Seeding, Migration, และ Automated Test Scripts
 ├── uploads/            # ที่จัดเก็บไฟล์เอกสารวิจัย PDF (uploads/pdfs/)
-├── utils/              # ฟังก์ชันเสริม (auditLog, sendError, serialize, searchFilter, sanitize)
+├── utils/              # ฟังก์ชันเสริม (audit, userImport, searchFilter, sendError, serialize)
 ├── .env.example        # ไฟล์ตัวอย่าง Environment Variables
 ├── .gitignore          # ไฟล์ Git Ignore
 ├── package.json        # Dependencies และคำสั่งสคริปต์

@@ -1,6 +1,5 @@
 const express = require('express');
 const crypto = require('crypto');
-const passport = require('../middleware/passport');
 const User = require('../models/User');
 const {
   signToken,
@@ -73,14 +72,21 @@ router.post('/register', async (req, res) => {
 /** POST /api/auth/login */
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'email และ password จำเป็น' });
+    const { email, studentId, username, identifier, password } = req.body;
+    const loginIdentifier = identifier || username || studentId || email;
+    if (!loginIdentifier || !password) {
+      return res.status(400).json({ error: 'กรุณากรอกรหัสนักศึกษา (หรืออีเมล) และรหัสผ่าน' });
     }
 
-    const user = await User.findOne({ email: String(email).trim().toLowerCase() }).select('+password');
+    const cleanIdentifier = String(loginIdentifier).trim();
+    const user = await User.findOne({
+      $or: [
+        { email: cleanIdentifier.toLowerCase() },
+        { studentId: cleanIdentifier },
+      ],
+    }).select('+password');
     if (!user || !(await user.comparePassword(password))) {
-      return res.status(401).json({ error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
+      return res.status(401).json({ error: 'รหัสนักศึกษา/อีเมล หรือรหัสผ่านไม่ถูกต้อง' });
     }
     if (!user.isActive) {
       return res.status(403).json({ error: 'บัญชีถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ' });
@@ -276,46 +282,5 @@ router.post('/logout', async (req, res) => {
     return sendError(res, err);
   }
 });
-
-/**
- * GET /api/auth/google
- * Redirects the browser to the Google consent screen.
- * Returns 503 if Google OAuth is not configured.
- */
-router.get('/google', (req, res, next) => {
-  // Check if Google OAuth is properly configured
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  if (!clientId || clientId === 'YOUR_GOOGLE_CLIENT_ID' || clientId === 'placeholder-google-client-id') {
-    return res.status(503).json({
-      error: 'Google OAuth ยังไม่ได้ตั้งค่า กรุณาตั้งค่า GOOGLE_CLIENT_ID ใน .env',
-    });
-  }
-  passport.authenticate('google', { scope: ['profile', 'email'], session: true })(req, res, next);
-});
-
-/**
- * GET /api/auth/google/callback
- * Google redirects here after the user grants/denies consent.
- * On success  → redirect to frontend with ?accessToken=<jwt>&refreshToken=<token>
- * On failure  → redirect to frontend with ?error=<reason>
- */
-router.get(
-  '/google/callback',
-  passport.authenticate('google', { session: true, failWithError: true }),
-  // Success handler
-  (req, res) => {
-    const { accessToken, refreshToken } = req.user; // set by passport strategy
-    const params = new URLSearchParams({
-      accessToken,
-      refreshToken,
-    });
-    return res.redirect(`${FRONTEND_URL}/auth/callback?${params.toString()}`);
-  },
-  // Error handler (failWithError: true sends errors here)
-  (err, req, res, _next) => {
-    const reason = err?.message || 'oauth_error';
-    return res.redirect(`${FRONTEND_URL}/auth/callback?error=${encodeURIComponent(reason)}`);
-  }
-);
 
 module.exports = router;
