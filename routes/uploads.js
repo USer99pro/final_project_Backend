@@ -14,7 +14,7 @@ router.use(authenticate);
 
 /**
  * GET /api/uploads/papers
- * รายการเอกสาร (paper/PDF) ที่อัปโหลดในโปรเจกต์ พร้อม path และ url
+ * List uploaded documents (paper/PDF) with path and url
  */
 router.get('/papers', async (req, res) => {
   try {
@@ -38,7 +38,7 @@ router.get('/papers', async (req, res) => {
 
 /**
  * GET /api/uploads/papers/:id
- * ข้อมูลเอกสารรายการเดียว + path เปิดไฟล์
+ * Single document information + file view path
  */
 router.get('/papers/:id', async (req, res) => {
   try {
@@ -63,7 +63,7 @@ router.get('/papers/:id', async (req, res) => {
 
 /**
  * GET /api/uploads/papers/:id/file
- * ดาวน์โหลด/เปิดไฟล์ PDF (ต้อง login)
+ * Download/view PDF file (login required)
  */
 router.get('/papers/:id/file', async (req, res) => {
   try {

@@ -24,8 +24,8 @@ const listPopulate = [
   { path: 'tags', select: 'name' },
 ];
 
-/** GET /api/public/projects — สืบค้นผลงานเผยแพร่ (ไม่ต้อง login) */
-/** GET /api/public/stats — สถิติภาพรวมสำหรับหน้าแรก */
+/** GET /api/public/projects — Search published works (no login required) */
+/** GET /api/public/stats — Overview statistics for landing page */
 router.get('/stats', async (req, res) => {
   try {
     const [totalProjects, totalStudents, totalMajors, latestYearDoc] = await Promise.all([

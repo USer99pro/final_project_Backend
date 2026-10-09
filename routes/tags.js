@@ -7,7 +7,7 @@ const { stripVersion } = require('../utils/serialize');
 
 const router = express.Router();
 
-/** GET /api/tags — อ่านได้ทุกคน (ไม่ต้อง login) */
+/** GET /api/tags — Public access (no login required) */
 router.get('/', async (req, res) => {
   try {
     const filter = {};

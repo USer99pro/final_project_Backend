@@ -9,7 +9,7 @@ const router = express.Router();
 
 /**
  * GET /api/advisors
- * ดึงรายการและค้นหาอาจารย์ที่ปรึกษา
+ * Fetch list and search advisors
  */
 router.get('/', async (req, res) => {
   try {
@@ -78,7 +78,7 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/advisors/:id
- * ดูข้อมูลรายละเอียดอาจารย์ที่ปรึกษาตาม ID
+ * View advisor details by ID
  */
 router.get('/:id', async (req, res) => {
   try {
@@ -94,8 +94,8 @@ router.get('/:id', async (req, res) => {
 
 /**
  * POST /api/advisors
- * เพิ่มอาจารย์ที่ปรึกษาคนใหม่ (graduate และ Admin สามารถเพิ่มได้)
- * ทำการตรวจสอบว่ามีชื่อและตำแหน่งทางวิชาการตรงกันอยู่ในระบบแล้วหรือไม่
+ * Add a new advisor (graduate and admin can add)
+ * Verify whether an advisor with matching name and academic position already exists
  */
 router.post('/', authenticate, requireGraduate, async (req, res) => {
   try {
@@ -120,7 +120,7 @@ router.post('/', authenticate, requireGraduate, async (req, res) => {
     const cleanFullName = String(fullName).trim();
     const cleanPosition = academicPosition ? String(academicPosition).trim() : '';
 
-    // ตรวจสอบข้อมูลชื่อและตำแหน่งของครูที่ปรึกษาว่ามีอยู่ในระบบแล้วหรือไม่
+    // Check whether an advisor with matching name and academic position already exists
     const duplicateFilter = {
       fullName: new RegExp(`^${escapeRegex(cleanFullName)}$`, 'i'),
     };
@@ -195,7 +195,7 @@ router.post('/', authenticate, requireGraduate, async (req, res) => {
 
 /**
  * PATCH /api/advisors/:id
- * แก้ไขข้อมูลอาจารย์ที่ปรึกษา (Admin เท่านั้น)
+ * Update advisor information (Admin only)
  */
 router.patch('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
@@ -274,7 +274,7 @@ router.patch('/:id', authenticate, requireAdmin, async (req, res) => {
 
 /**
  * DELETE /api/advisors/:id
- * ลบข้อมูลอาจารย์ที่ปรึกษา (Admin เท่านั้น)
+ * Delete advisor information (Admin only)
  */
 router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
   try {

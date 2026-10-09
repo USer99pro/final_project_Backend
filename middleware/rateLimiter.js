@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 /**
  * rateLimiter.js
@@ -19,7 +19,7 @@ function rateLimitHandler(req, res) {
 }
 
 /**
- * Global limiter â€” applied to all routes.
+ * Global limiter — applied to all routes.
  * Default: 1,000 requests per 15 minutes per IP (customizable via RATE_LIMIT_GLOBAL_MAX).
  */
 const globalLimiter = rateLimit({
@@ -32,7 +32,7 @@ const globalLimiter = rateLimit({
 });
 
 /**
- * Auth limiter â€” stricter, applied to /api/auth routes.
+ * Auth limiter — stricter, applied to /api/auth routes.
  * Default: 30 requests per 15 minutes per IP (customizable via RATE_LIMIT_AUTH_MAX).
  * Protects login/register/forgot-password from brute-force.
  */

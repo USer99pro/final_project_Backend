@@ -1,4 +1,4 @@
-/** path สาธารณะสำหรับไฟล์ paper (PDF) */
+/** Public path for paper files (PDF) */
 const PAPERS_URL_PATH = process.env.PAPERS_URL_PATH || '/uploads/papers';
 
 function getBaseUrl(req) {

@@ -201,7 +201,7 @@ router.patch('/users/:id/role', async (req, res) => {
 });
 
 /** POST /api/admin/users/:id/reset-password
- *  รับได้ทั้ง MongoDB _id (24 hex) และ studentId (รหัสนักศึกษา)
+ *  Accepts both MongoDB _id (24 hex) and studentId
  */
 router.post('/users/:id/reset-password', async (req, res) => {
   try {
@@ -215,7 +215,7 @@ router.post('/users/:id/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'newPassword ต้องมีอย่างน้อย 6 ตัวอักษร' });
     }
 
-    // ค้นหาด้วย MongoDB _id ถ้าเป็น 24 hex, ไม่งั้นค้นด้วย studentId
+    // Find by MongoDB _id if 24 hex, otherwise find by studentId
     let user = null;
     if (isValidId(id)) {
       user = await User.findById(id).select('+password');
@@ -247,7 +247,7 @@ router.post('/users/:id/reset-password', async (req, res) => {
 
 /**
  * GET /api/admin/users/import-template
- * ดาวน์โหลดแม่แบบไฟล์สำหรับนำเข้าผู้ใช้ (CSV หรือ XLSX)
+ * Download user import template file (CSV or XLSX)
  */
 router.get('/users/import-template', (req, res) => {
   try {
@@ -263,7 +263,7 @@ router.get('/users/import-template', (req, res) => {
 
 /**
  * POST /api/admin/users/import
- * นำเข้าผู้ใช้งานจำนวนมากผ่านไฟล์ CSV หรือ Excel (.xlsx / .xls)
+ * Bulk import users via CSV or Excel (.xlsx / .xls)
  */
 router.post('/users/import', uploadSpreadsheet.single('file'), async (req, res) => {
   try {

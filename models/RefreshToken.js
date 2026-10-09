@@ -15,7 +15,7 @@ const refreshTokenSchema = new mongoose.Schema(
   { timestamps: { createdAt: true, updatedAt: false }, collection: 'refresh_tokens' }
 );
 
-// TTL index — MongoDB จะลบ document อัตโนมัติเมื่อ expiresAt ถึง
+// TTL index — MongoDB automatically deletes documents when expiresAt is reached
 refreshTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 /**

@@ -29,11 +29,11 @@ const PORT = Number(process.env.PORT) || 3000;
 // Trust reverse proxy (e.g. Render, Heroku, Cloudflare) to correctly identify client IP in rate limiting
 app.set('trust proxy', Number(process.env.TRUST_PROXY) || 1);
 
-// â”€â”€ Security: Helmet headers + Permissions-Policy â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Security: Helmet headers + Permissions-Policy ────────────────────────
 app.use(securityHeaders());
 app.use(permissionsPolicy);
 
-// â”€â”€ CORS â€” whitelist frontend origins â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── CORS — whitelist frontend origins ────────────────────────────────────
 const rawFrontendUrls = (process.env.FRONTEND_URL || 'http://localhost:5173')
   .split(',')
   .map((url) => url.trim().replace(/\/$/, ''))
@@ -94,7 +94,7 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// â”€â”€ Global rate limit (100 req / 15 min per IP) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Global rate limit (100 req / 15 min per IP) ──────────────────────────
 app.use(globalLimiter);
 
 app.use(express.json());
@@ -152,7 +152,7 @@ app.use((err, _req, res, next) => {
   if (err instanceof multer.MulterError) {
     const message =
       err.code === 'LIMIT_FILE_SIZE'
-        ? 'à¹„à¸Ÿà¸¥à¹Œ PDF à¸¡à¸µà¸‚à¸™à¸²à¸”à¹ƒà¸«à¸à¹ˆà¹€à¸à¸´à¸™à¸à¸³à¸«à¸™à¸” (à¸ªà¸¹à¸‡à¸ªà¸¸à¸” 15MB)'
+        ? 'PDF file size exceeds the limit (maximum 15MB)'
         : err.message;
     return res.status(400).json({ error: message });
   }
@@ -163,9 +163,9 @@ app.use((err, _req, res, next) => {
 });
 
 app.use((err, _req, res, _next) => {
-  // â”€â”€ Sanitize error responses in production â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Sanitize error responses in production ──────────────────────────────
   // Never leak internal stack traces or raw error messages to clients.
-  const message = IS_PROD ? 'à¹€à¸à¸´à¸”à¸‚à¹‰à¸­à¸œà¸´à¸”à¸žà¸¥à¸²à¸”à¸ à¸²à¸¢à¹ƒà¸™à¹€à¸‹à¸´à¸£à¹Œà¸Ÿà¹€à¸§à¸­à¸£à¹Œ' : (err.message || 'Server error');
+  const message = IS_PROD ? 'Internal server error' : (err.message || 'Server error');
   if (!IS_PROD) console.error('[Server Error]', err);
   res.status(500).json({ error: message });
 });
@@ -174,14 +174,14 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   connectDB()
     .then(() => {
       const server = app.listen(PORT, () => {
-        console.log(`âœ… API ready â†’ http://localhost:${PORT}`);
+        console.log(`✅ API ready → http://localhost:${PORT}`);
         console.log(`   JWT expiry    : 30 days`);
       });
 
       server.on('error', (err) => {
         if (err.code === 'EADDRINUSE') {
-          console.error(`\nâ Œ à¸žà¸­à¸£à¹Œà¸• ${PORT} à¸–à¸¹à¸ à¹ƒà¸Šà¹‰à¸‡à¸²à¸™à¸­à¸¢à¸¹à¹ˆà¹ à¸¥à¹‰à¸§`);
-          console.error(`   netstat -ano | findstr :${PORT}  à¹ à¸¥à¹‰à¸§  taskkill /PID <pid> /F\n`);
+          console.error(`\n❌ Port ${PORT} is already in use`);
+          console.error(`   netstat -ano | findstr :${PORT}  then  taskkill /PID <pid> /F\n`);
           process.exit(1);
         }
         throw err;

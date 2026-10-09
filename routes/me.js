@@ -9,7 +9,7 @@ const router = express.Router();
 
 router.use(authenticate);
 
-/** GET /api/me/works — ผลงานของตัวเอง */
+/** GET /api/me/works — User's own works */
 router.get('/works', async (req, res) => {
   try {
     const items = await Content.find({ author: req.user._id })
@@ -26,7 +26,7 @@ router.get('/works', async (req, res) => {
   }
 });
 
-/** GET /api/me/activity — ประวัติการดำเนินงาน */
+/** GET /api/me/activity — User activity history */
 router.get('/activity', async (req, res) => {
   try {
     const myContentIds = await Content.find({ author: req.user._id }).distinct('_id');
@@ -44,7 +44,7 @@ router.get('/activity', async (req, res) => {
   }
 });
 
-/** GET /api/me/advisors — อาจารย์ที่ปรึกษาในผลงานของตนเอง */
+/** GET /api/me/advisors — Advisors in user's works */
 router.get('/advisors', async (req, res) => {
   try {
     const works = await Content.find({

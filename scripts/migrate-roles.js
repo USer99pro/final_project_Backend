@@ -1,6 +1,6 @@
 /**
- * แปลง role: user → graduate และตั้งค่า isActive ให้ผู้ใช้เดิม
- * ใช้: node scripts/migrate-roles.js
+ * Convert role: user → graduate and set isActive for existing users
+ * Usage: node scripts/migrate-roles.js
  */
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });

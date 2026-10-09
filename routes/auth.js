@@ -20,7 +20,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 // Local Auth
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** POST /api/auth/register — นักศึกษาจบการศึกษาสมัครสมาชิก */
+/** POST /api/auth/register — Graduate student registration */
 router.post('/register', async (req, res) => {
   try {
     const { studentId, fullName, major, email, password, confirmPassword } = req.body;
@@ -106,7 +106,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-/** GET /api/auth/me — ดึงข้อมูลผู้ใช้ปัจจุบัน */
+/** GET /api/auth/me — Get current user profile */
 router.get('/me', authenticate, (req, res) => {
   res.json(stripVersion(req.user.toPublicJSON()));
 });
@@ -117,7 +117,7 @@ router.get('/me', authenticate, (req, res) => {
 
 /**
  * POST /api/auth/forgot-password
- * ขอรีเซ็ตรหัสผ่านผ่านอีเมล
+ * Request password reset via email
  */
 router.post('/forgot-password', async (req, res) => {
   try {
@@ -137,7 +137,7 @@ router.post('/forgot-password', async (req, res) => {
     const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
 
     user.resetPasswordToken = resetTokenHash;
-    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 ชั่วโมง
+    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
     await user.save();
 
     // F2: Never return the raw resetToken in the HTTP response.
@@ -154,7 +154,7 @@ router.post('/forgot-password', async (req, res) => {
 
 /**
  * POST /api/auth/reset-password
- * รีเซ็ตรหัสผ่านด้วย resetToken
+ * Reset password using resetToken
  */
 router.post('/reset-password', async (req, res) => {
   try {
@@ -196,7 +196,7 @@ router.post('/reset-password', async (req, res) => {
 
 /**
  * POST /api/auth/change-password
- * เปลี่ยนรหัสผ่านสำหรับผู้ใช้งานที่เข้าสู่ระบบอยู่ (ต้องระบุรหัสผ่านเดิม)
+ * Change password for logged-in user (requires current password)
  */
 
 router.post('/change-password', authenticate, async (req, res) => {
@@ -243,7 +243,7 @@ router.post('/change-password', authenticate, async (req, res) => {
 
 /**
  * POST /api/auth/refresh
- * รับ refreshToken → ตรวจสอบ → หมุนเวียน → ส่ง accessToken + refreshToken ใหม่
+ * Receive refreshToken → verify → rotate → return new accessToken + refreshToken
  */
 router.post('/refresh', async (req, res) => {
   try {

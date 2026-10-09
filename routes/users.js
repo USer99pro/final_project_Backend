@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
         filter.isActive = req.query.isActive === 'true';
       }
     } else {
-      // บัณฑิตเห็นเฉพาะผู้ใช้ในแผนกตัวเอง (สำหรับเลือกผู้ร่วมจัดทำ)
+      // Graduate students see only users in their own department (for selecting co-authors)
       filter.major = String(req.user.major || '').trim();
     }
 
@@ -38,7 +38,7 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/users/advisors
- * ดึงรายการและค้นหาอาจารย์ที่ปรึกษาสำหรับผู้ใช้งาน
+ * Fetch list and search advisors for users
  */
 router.get('/advisors', async (req, res) => {
   try {
@@ -108,7 +108,7 @@ router.get('/advisors', async (req, res) => {
 
 /**
  * GET /api/users/advisors/:advisorId
- * ดูรายละเอียดอาจารย์ที่ปรึกษาตาม ID สำหรับผู้ใช้งาน
+ * View advisor details by ID for users
  */
 router.get('/advisors/:advisorId', async (req, res) => {
   try {
@@ -146,7 +146,7 @@ router.post('/advisors', requireGraduate, async (req, res) => {
     const cleanFullName = String(fullName).trim();
     const cleanPosition = academicPosition ? String(academicPosition).trim() : '';
 
-    // ตรวจสอบข้อมูลชื่อและตำแหน่งของครูที่ปรึกษาว่ามีอยู่ในระบบแล้วหรือไม่
+    // Check whether an advisor with the same name and academic position already exists in the system
     const duplicateFilter = {
       fullName: new RegExp(`^${escapeRegex(cleanFullName)}$`, 'i'),
     };
@@ -237,7 +237,7 @@ router.get('/:id', async (req, res) => {
 
 /**
  * GET /api/users/import-template
- * ดาวน์โหลดแม่แบบไฟล์สำหรับนำเข้าผู้ใช้ (CSV หรือ XLSX)
+ * Download user import template file (CSV or XLSX)
  */
 router.get('/import-template', requireAdmin, (req, res) => {
   try {
@@ -253,7 +253,7 @@ router.get('/import-template', requireAdmin, (req, res) => {
 
 /**
  * POST /api/users/import
- * นำเข้าผู้ใช้งานจำนวนมากผ่านไฟล์ CSV หรือ Excel (.xlsx / .xls)
+ * Bulk import users via CSV or Excel (.xlsx / .xls)
  */
 router.post('/import', requireAdmin, uploadSpreadsheet.single('file'), async (req, res) => {
   try {
@@ -339,7 +339,7 @@ router.patch('/:id', async (req, res) => {
     }
     if (phone != null) user.phone = String(phone).trim();
 
-    // ตรวจสอบว่ามีการเปลี่ยนสาขา (major) หรือไม่
+    // Check if department/major has changed
     let majorChanged = false;
     let newMajor = user.major;
     if (major != null) {
@@ -369,7 +369,7 @@ router.patch('/:id', async (req, res) => {
       await user.save();
     }
 
-    // หากสาขาเปลี่ยน ให้อัปเดตผลงานวิจัยทั้งหมดที่ user นี้เป็น author
+    // If major has changed, update all research contents authored by this user
     if (majorChanged) {
       await Content.updateMany({ author: user._id }, { $set: { major: newMajor } });
     }

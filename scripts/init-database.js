@@ -1,12 +1,12 @@
 /**
- * สร้างฐานข้อมูล + บัญชี admin (สิทธิ์ผู้ดูแลระบบ)
+ * Initialize database + create admin account (Administrator)
  *
- * ใช้: npm run init:db
- * ตั้งค่าใน .env:
+ * Usage: npm run init:db
+ * Configuration in .env:
  *   MONGO_URI, MONGO_DB
  *   ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_FULL_NAME
  *
- * รีเซ็ตรหัส admin จาก .env (ถ้ามี admin แล้ว):
+ * Reset admin password from .env (if admin already exists):
  *   npm run init:db -- --reset-password
  */
 const path = require('path');

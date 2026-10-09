@@ -7,7 +7,7 @@ function escapeRegex(s) {
 }
 
 /**
- * สร้าง MongoDB filter สำหรับสืบค้นผลงาน (public หรือ admin list)
+ * Build MongoDB filter for querying works (public or admin list)
  */
 async function findIds(Model, name) {
   if (!name) return [];
