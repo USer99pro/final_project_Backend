@@ -277,13 +277,15 @@ router.post('/import', requireAdmin, uploadSpreadsheet.single('file'), async (re
 router.post('/', requireAdmin, async (req, res) => {
   try {
     const { studentId, fullName, email, password, major, phone, role } = req.body;
-    if (!fullName || !email || !password) {
-      return res.status(400).json({ error: 'fullName, email, password จำเป็น' });
+    if (!fullName || !password) {
+      return res.status(400).json({ error: 'fullName and password are required' });
     }
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(String(email).trim())) {
-      return res.status(400).json({ error: 'อีเมลไม่ถูกต้อง' });
+    const cleanEmail = email && String(email).trim() ? String(email).trim().toLowerCase() : '';
+    if (cleanEmail) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanEmail)) {
+        return res.status(400).json({ error: 'รูปแบบอีเมลไม่ถูกต้อง' });
+      }
     }
     const r = role || 'graduate';
     if (!['graduate', 'admin'].includes(r)) {
@@ -291,9 +293,9 @@ router.post('/', requireAdmin, async (req, res) => {
     }
 
     const user = await User.create({
-      studentId: studentId != null ? String(studentId).trim() : undefined,
+      studentId: studentId != null && String(studentId).trim() ? String(studentId).trim() : undefined,
       fullName: String(fullName).trim(),
-      email: String(email).trim(),
+      email: cleanEmail || undefined,
       password: String(password),
       major: major != null ? String(major).trim() : '',
       phone: phone != null ? String(phone).trim() : '',
@@ -323,7 +325,18 @@ router.patch('/:id', async (req, res) => {
       user.studentId = String(studentId).trim();
     }
     if (fullName != null) user.fullName = String(fullName).trim();
-    if (email != null) user.email = String(email).trim();
+    if (email !== undefined) {
+      const cleanEmail = email && String(email).trim() ? String(email).trim().toLowerCase() : '';
+      if (cleanEmail) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(cleanEmail)) {
+          return res.status(400).json({ error: 'รูปแบบอีเมลไม่ถูกต้อง' });
+        }
+        user.email = cleanEmail;
+      } else {
+        user.email = undefined;
+      }
+    }
     if (phone != null) user.phone = String(phone).trim();
 
     // ตรวจสอบว่ามีการเปลี่ยนสาขา (major) หรือไม่

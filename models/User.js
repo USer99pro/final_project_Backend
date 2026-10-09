@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema(
     studentId: { type: String, trim: true, sparse: true, unique: true },
     citizenId: { type: String, trim: true, sparse: true },
     fullName: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    email: { type: String, sparse: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, minlength: 6, select: false },
     major: { type: String, trim: true, default: '' },
     phone: { type: String, trim: true, default: '' },
