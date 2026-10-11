@@ -179,12 +179,17 @@ router.use(authenticate);
 
 router.get('/', async (req, res) => {
   try {
-    const filter =
-      req.user.role === 'admin'
-        ? await buildResearchFilter(req.query, { publishedOnly: false })
-        : { author: req.user._id };
-
-    if (req.user.role !== 'admin') {
+    let filter;
+    if (req.user.role === 'admin') {
+      filter = await buildResearchFilter(req.query, { publishedOnly: false });
+    } else {
+      // Graduate/user sees their own projects AND projects where they are a co-creator (participant)
+      filter = {
+        $or: [
+          { author: req.user._id },
+          { participants: req.user._id },
+        ],
+      };
       if (req.query.status) filter.status = req.query.status;
     }
 

@@ -214,11 +214,23 @@ function requireGraduate(req, res, next) {
 function isOwnerOrAdmin(doc, user) {
   if (!doc || !user) return false;
   if (user.role === 'admin') return true;
+
+  const userId = user._id.toString();
+
+  // Check if user is the author
   const author = doc.author;
   const ownerId =
     author?._id?.toString?.() ||
     (author && typeof author.toString === 'function' ? author.toString() : null);
-  return ownerId === user._id.toString();
+  if (ownerId === userId) return true;
+
+  // Check if user is a participant (project co-creator)
+  const participants = doc.participants || [];
+  return participants.some((p) => {
+    const pid = p?._id?.toString?.() ||
+      (p && typeof p.toString === 'function' ? p.toString() : null);
+    return pid === userId;
+  });
 }
 
 // ── Audit Helpers ────────────────────────────────────────────────────────────
