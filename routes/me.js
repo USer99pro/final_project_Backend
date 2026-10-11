@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const Content = require('../models/Content');
 const ActivityLog = require('../models/ActivityLog');
 const { authenticate } = require('../middleware/auth');
@@ -15,6 +15,25 @@ router.get('/works', async (req, res) => {
     const items = await Content.find({ author: req.user._id })
       .populate('category', 'name')
       .populate('tags', 'name')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      count: items.length,
+      works: items.map((item) => stripVersion(enrichContent(item, req))),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** GET /api/me/co-works — Works where the current user is a project co-creator (participant) */
+router.get('/co-works', async (req, res) => {
+  try {
+    const items = await Content.find({ participants: req.user._id })
+      .populate('category', 'name')
+      .populate('tags', 'name')
+      .populate('author', 'fullName studentId major')
+      .populate('participants', 'fullName studentId major')
       .sort({ createdAt: -1 });
 
     res.json({
