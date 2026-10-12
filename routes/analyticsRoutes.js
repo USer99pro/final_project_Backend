@@ -30,7 +30,6 @@ router.get('/insights', handler('insights'));
 // New visitor-analytics routes (from Analytics model)
 router.get('/summary', handler('summary'));
 router.get('/visitor-trends', handler('visitorTrends'));
-router.get('/top-pages', handler('topPages'));
 router.get('/devices', handler('deviceAnalytics'));
 
 module.exports = router;

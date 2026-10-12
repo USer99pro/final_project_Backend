@@ -5,6 +5,7 @@
     "build": "echo 'No build step required'",
     "init:db": "node scripts/init-database.js",
     "migrate:roles": "node scripts/migrate-roles.js",
+    "migrate:remove-page-analytics": "node scripts/remove-page-analytics.js",
     "seed:admin": "node scripts/init-database.js",
     "test:api": "node scripts/test-api.js",
     "default": "npm run dev"

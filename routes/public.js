@@ -56,6 +56,24 @@ router.get('/stats', async (req, res) => {
 router.get('/projects', async (req, res) => {
   try {
     const filter = await buildResearchFilter(req.query, { publishedOnly: true });
+    if (req.query.summary === '1') {
+      const items = await Content.find(filter)
+        .select('title studentName major academicYear category author')
+        .populate('author', 'fullName')
+        .populate('category', 'name')
+        .sort({ createdAt: -1 })
+        .lean();
+      const projects = items.map((item) => ({
+        _id: item._id,
+        title: item.title,
+        studentName: item.studentName || item.author?.fullName || '',
+        major: item.major || '',
+        academicYear: item.academicYear || '',
+        category: item.category || null,
+      }));
+      return res.json({ count: projects.length, projects });
+    }
+
     const items = await Content.find(filter)
       .populate(listPopulate)
       .sort({ createdAt: -1 });

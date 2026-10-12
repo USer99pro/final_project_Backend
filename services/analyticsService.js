@@ -108,8 +108,38 @@ async function popularSearches(query) { return popularKeywords(query); }
 
 async function popularWorks(query) {
   const sortBy = ['downloads', 'recent'].includes(query.sortBy) ? query.sortBy : 'views';
-  const activityCollection = sortBy === 'downloads' ? 'download_logs' : 'view_logs';
-  return { data: await Content.aggregate([{ $match: contentMatch(query) }, { $lookup: { from: 'view_logs', localField: '_id', foreignField: 'workId', as: 'views' } }, { $lookup: { from: 'download_logs', localField: '_id', foreignField: 'workId', as: 'downloads' } }, { $lookup: { from: activityCollection, localField: '_id', foreignField: 'workId', as: 'activity' } }, { $addFields: { viewsCount: { $size: '$views' }, downloadsCount: { $size: '$downloads' }, recentActivity: { $max: '$activity.createdAt' } } }, { $sort: sortBy === 'recent' ? { recentActivity: -1 } : sortBy === 'downloads' ? { downloadsCount: -1 } : { viewsCount: -1 } }, { $limit: toInt(query.limit) }, { $project: { _id: 1, title: 1, studentName: 1, department: '$major', academicYear: 1, views: '$viewsCount', downloads: '$downloadsCount' } }]) };
+  return { data: await Content.aggregate([
+    { $match: contentMatch(query) },
+    { $project: { _id: 1, title: 1, studentName: 1, major: 1, academicYear: 1 } },
+    {
+      $lookup: {
+        from: 'view_logs',
+        localField: '_id',
+        foreignField: 'workId',
+        pipeline: [{ $group: { _id: null, count: { $sum: 1 }, latest: { $max: '$createdAt' } } }],
+        as: 'viewStats',
+      },
+    },
+    {
+      $lookup: {
+        from: 'download_logs',
+        localField: '_id',
+        foreignField: 'workId',
+        pipeline: [{ $group: { _id: null, count: { $sum: 1 } } }],
+        as: 'downloadStats',
+      },
+    },
+    {
+      $addFields: {
+        viewsCount: { $ifNull: [{ $arrayElemAt: ['$viewStats.count', 0] }, 0] },
+        downloadsCount: { $ifNull: [{ $arrayElemAt: ['$downloadStats.count', 0] }, 0] },
+        recentActivity: { $arrayElemAt: ['$viewStats.latest', 0] },
+      },
+    },
+    { $sort: sortBy === 'recent' ? { recentActivity: -1 } : sortBy === 'downloads' ? { downloadsCount: -1 } : { viewsCount: -1 } },
+    { $limit: toInt(query.limit) },
+    { $project: { _id: 1, title: 1, studentName: 1, department: '$major', academicYear: 1, views: '$viewsCount', downloads: '$downloadsCount' } },
+  ]) };
 }
 
 async function usageTrend(query) {
@@ -231,18 +261,6 @@ async function visitorTrends(query) {
   return Object.values(dateMap).sort((a, b) => a.date.localeCompare(b.date));
 }
 
-async function topPages(query) {
-  const range = dateRangeFromPeriod(query.period, query.startDate, query.endDate);
-  const limit = Math.min(parseInt(query.limit, 10) || 10, 50);
-  return Analytics.aggregate([
-    { $match: { event: 'PAGE_VIEW', page: { $ne: null }, createdAt: range } },
-    { $group: { _id: '$page', views: { $sum: 1 } } },
-    { $sort: { views: -1 } },
-    { $limit: limit },
-    { $project: { _id: 0, page: '$_id', views: 1 } },
-  ]);
-}
-
 async function deviceAnalytics(query) {
   const range = dateRangeFromPeriod(query.period, query.startDate, query.endDate);
   const results = await Analytics.aggregate([
@@ -258,4 +276,4 @@ async function deviceAnalytics(query) {
   }));
 }
 
-module.exports = { overview, worksTrend, worksByDepartment: (q) => groupContentBy('major', q, q.limit), worksByCategory, worksByType, popularKeywords, keywordTrend, popularSearches, popularWorks, usageTrend, insights, summary, visitorTrends, topPages, deviceAnalytics };
+module.exports = { overview, worksTrend, worksByDepartment: (q) => groupContentBy('major', q, q.limit), worksByCategory, worksByType, popularKeywords, keywordTrend, popularSearches, popularWorks, usageTrend, insights, summary, visitorTrends, deviceAnalytics };

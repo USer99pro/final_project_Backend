@@ -32,13 +32,6 @@ const analyticsSchema = new mongoose.Schema(
       index: true,
     },
 
-    page: {
-      type: String,
-      default: null,
-      maxlength: 500,
-      index: true,
-    },
-
     workId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Content',
