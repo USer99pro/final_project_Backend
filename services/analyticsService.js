@@ -108,8 +108,38 @@ async function popularSearches(query) { return popularKeywords(query); }
 
 async function popularWorks(query) {
   const sortBy = ['downloads', 'recent'].includes(query.sortBy) ? query.sortBy : 'views';
-  const activityCollection = sortBy === 'downloads' ? 'download_logs' : 'view_logs';
-  return { data: await Content.aggregate([{ $match: contentMatch(query) }, { $lookup: { from: 'view_logs', localField: '_id', foreignField: 'workId', as: 'views' } }, { $lookup: { from: 'download_logs', localField: '_id', foreignField: 'workId', as: 'downloads' } }, { $lookup: { from: activityCollection, localField: '_id', foreignField: 'workId', as: 'activity' } }, { $addFields: { viewsCount: { $size: '$views' }, downloadsCount: { $size: '$downloads' }, recentActivity: { $max: '$activity.createdAt' } } }, { $sort: sortBy === 'recent' ? { recentActivity: -1 } : sortBy === 'downloads' ? { downloadsCount: -1 } : { viewsCount: -1 } }, { $limit: toInt(query.limit) }, { $project: { _id: 1, title: 1, studentName: 1, department: '$major', academicYear: 1, views: '$viewsCount', downloads: '$downloadsCount' } }]) };
+  return { data: await Content.aggregate([
+    { $match: contentMatch(query) },
+    { $project: { _id: 1, title: 1, studentName: 1, major: 1, academicYear: 1 } },
+    {
+      $lookup: {
+        from: 'view_logs',
+        localField: '_id',
+        foreignField: 'workId',
+        pipeline: [{ $group: { _id: null, count: { $sum: 1 }, latest: { $max: '$createdAt' } } }],
+        as: 'viewStats',
+      },
+    },
+    {
+      $lookup: {
+        from: 'download_logs',
+        localField: '_id',
+        foreignField: 'workId',
+        pipeline: [{ $group: { _id: null, count: { $sum: 1 } } }],
+        as: 'downloadStats',
+      },
+    },
+    {
+      $addFields: {
+        viewsCount: { $ifNull: [{ $arrayElemAt: ['$viewStats.count', 0] }, 0] },
+        downloadsCount: { $ifNull: [{ $arrayElemAt: ['$downloadStats.count', 0] }, 0] },
+        recentActivity: { $arrayElemAt: ['$viewStats.latest', 0] },
+      },
+    },
+    { $sort: sortBy === 'recent' ? { recentActivity: -1 } : sortBy === 'downloads' ? { downloadsCount: -1 } : { viewsCount: -1 } },
+    { $limit: toInt(query.limit) },
+    { $project: { _id: 1, title: 1, studentName: 1, department: '$major', academicYear: 1, views: '$viewsCount', downloads: '$downloadsCount' } },
+  ]) };
 }
 
 async function usageTrend(query) {

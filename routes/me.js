@@ -12,7 +12,12 @@ router.use(authenticate);
 /** GET /api/me/works — User's own works */
 router.get('/works', async (req, res) => {
   try {
-    const items = await Content.find({ author: req.user._id })
+    const items = await Content.find({
+      $or: [{ author: req.user._id }, { participants: req.user._id }],
+    })
+      .populate('author', 'fullName email studentId major')
+      .populate('participants', 'fullName email studentId major')
+      .populate('advisor advisors', 'prefix fullName academicPosition email departmentName')
       .populate('category', 'name')
       .populate('tags', 'name')
       .sort({ createdAt: -1 });
@@ -48,7 +53,9 @@ router.get('/co-works', async (req, res) => {
 /** GET /api/me/activity — User activity history */
 router.get('/activity', async (req, res) => {
   try {
-    const myContentIds = await Content.find({ author: req.user._id }).distinct('_id');
+    const myContentIds = await Content.find({
+      $or: [{ author: req.user._id }, { participants: req.user._id }],
+    }).distinct('_id');
     const logs = await ActivityLog.find({
       $or: [{ byUser: req.user._id }, { contentId: { $in: myContentIds } }],
     })
