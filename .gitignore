@@ -58,3 +58,10 @@ Thumbs.db
 skills-lock.json
 *.tsbuildinfo
 .eslintcache
+
+.archify/
+.archify
+.agent/
+
+.md
+.md/*

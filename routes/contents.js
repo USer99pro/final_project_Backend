@@ -14,6 +14,7 @@ const { stripVersion } = require('../utils/serialize');
 const { enrichContent } = require('../utils/paths');
 const { logActivity } = require('../utils/activity');
 const { buildResearchFilter } = require('../utils/searchFilter');
+const { sendError } = require('../utils/sendError');
 
 const router = express.Router();
 
@@ -203,7 +204,7 @@ router.get('/', async (req, res) => {
 
     res.json(items.map((item) => contentJson(item, req)));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -221,7 +222,7 @@ router.get('/:id', async (req, res) => {
     }
     res.json(contentJson(item, req));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -319,7 +320,7 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
     res.status(201).json(contentJson(populated, req));
   } catch (err) {
     if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -440,7 +441,7 @@ router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
     res.json(contentJson(populated, req));
   } catch (err) {
     if (uploadedPath && req.file?.filename) await removePdfFile(req.file.filename);
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -463,7 +464,7 @@ router.delete('/:id', async (req, res) => {
     await item.deleteOne();
     res.json({ message: 'ลบผลงานแล้ว', id: item._id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 

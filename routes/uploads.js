@@ -2,11 +2,13 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const Content = require('../models/Content');
+const { isValidObjectId } = require('mongoose');
 const PdfFile = require('../models/PdfFile');
 const { authenticate, isOwnerOrAdmin } = require('../middleware/auth');
 const { uploadDir } = require('../middleware/uploadPdf');
 const { enrichContent } = require('../utils/paths');
 const { stripVersion } = require('../utils/serialize');
+const { sendError } = require('../utils/sendError');
 
 const router = express.Router();
 
@@ -32,7 +34,7 @@ router.get('/papers', async (req, res) => {
       papers: items.map((item) => stripVersion(enrichContent(item, req))),
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -41,6 +43,9 @@ router.get('/papers', async (req, res) => {
  * Single document information + file view path
  */
 router.get('/papers/:id', async (req, res) => {
+  if (!isValidObjectId(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid ID format' });
+  }
   try {
     const item = await Content.findById(req.params.id)
       .populate('author', 'fullName email')
@@ -57,7 +62,7 @@ router.get('/papers/:id', async (req, res) => {
 
     res.json(stripVersion(enrichContent(item, req)));
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 
@@ -107,7 +112,7 @@ router.get('/papers/:id/file', async (req, res) => {
       }
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err);
   }
 });
 

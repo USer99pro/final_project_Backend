@@ -169,7 +169,7 @@ async function authenticate(req, res, next) {
   }
 
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
     const user = await User.findById(payload.userId);
     if (!user) {
       return res.status(401).json({ error: 'ผู้ใช้ไม่พบหรือถูกลบแล้ว' });

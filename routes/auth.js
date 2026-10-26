@@ -38,7 +38,7 @@ router.post('/register', async (req, res) => {
     if (password !== confirmPassword) {
       return res.status(400).json({ error: 'รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน' });
     }
-    if (String(password).length < 6) {
+    if (String(password).length < 8) {
       return res.status(400).json({ error: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' });
     }
 
@@ -167,7 +167,7 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน' });
     }
 
-    if (String(newPassword).length < 6) {
+    if (String(newPassword).length < 8) {
       return res.status(400).json({ error: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' });
     }
 
@@ -210,7 +210,7 @@ router.post('/change-password', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน' });
     }
 
-    if (String(newPassword).length < 6) {
+    if (String(newPassword).length < 8) {
       return res.status(400).json({ error: 'รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร' });
     }
 
