@@ -16,7 +16,7 @@ const { processUserImport, generateImportTemplate } = require('../utils/userImpo
 const { logAudit } = require('../utils/audit');
 const { logActivity } = require('../utils/activity');
 const { stripVersion } = require('../utils/serialize');
-const { buildResearchFilter } = require('../utils/searchFilter');
+const { buildResearchFilter, escapeRegex } = require('../utils/searchFilter');
 const { enrichContent } = require('../utils/paths');
 const { sendError } = require('../utils/sendError');
 const analyticsRoutes = require('./analyticsRoutes');
@@ -94,10 +94,11 @@ router.get('/users', async (req, res) => {
     if (req.query.isActive) filter.isActive = req.query.isActive === 'true';
     if (req.query.major) filter.major = String(req.query.major).trim();
     if (req.query.search) {
+      const search = escapeRegex(req.query.search);
       filter.$or = [
-        { fullName: new RegExp(req.query.search, 'i') },
-        { email: new RegExp(req.query.search, 'i') },
-        { studentId: new RegExp(req.query.search, 'i') },
+        { fullName: new RegExp(search, 'i') },
+        { email: new RegExp(search, 'i') },
+        { studentId: new RegExp(search, 'i') },
       ];
     }
     

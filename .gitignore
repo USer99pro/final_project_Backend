@@ -65,6 +65,7 @@ skills-lock.json
 
 .md
 .md/*
+*.md
 
 .github
 .github/

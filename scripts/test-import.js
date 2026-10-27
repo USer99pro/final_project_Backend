@@ -57,16 +57,8 @@ const {
   await readWb.xlsx.load(xlsxTemplate.buffer);
   const usersSheet = readWb.getWorksheet('Users');
   assert(usersSheet, 'Template must include Users sheet');
-  const sheetRows = [];
-  usersSheet.eachRow({ includeEmpty: false }, (row, idx) => {
-    if (idx === 1) return; // skip header
-    const obj = {};
-    usersSheet.columns.forEach((col) => {
-      obj[col.key] = row.getCell(col.key).text;
-    });
-    sheetRows.push(obj);
-  });
-  assert(sheetRows.length >= 2, 'Template should contain sample rows');
+  const sampleRowCount = usersSheet.rowCount - 1;
+  assert(sampleRowCount >= 2, 'Template should contain sample rows');
   console.log('✓ XLSX template generated and verified successfully');
 
   const csvTemplate = await generateImportTemplate('csv');
