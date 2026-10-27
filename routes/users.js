@@ -49,7 +49,7 @@ router.get('/advisors', async (req, res) => {
       filter.isActive = true;
     }
 
-    const deptQuery = req.query.department || req.query.major;
+    const deptQuery = [req.query.department, req.query.major].find((value) => typeof value === 'string' && value);
     if (deptQuery) {
       filter.$or = [
         { department: deptQuery },
@@ -171,7 +171,7 @@ router.post('/advisors', requireGraduate, async (req, res) => {
     let deptObjId = null;
     let resolvedDeptName = departmentName ? String(departmentName).trim() : '';
 
-    if (department) {
+    if (typeof department === 'string' && department) {
       let deptDoc = null;
       if (mongoose.Types.ObjectId.isValid(department)) {
         deptDoc = await Department.findById(department);

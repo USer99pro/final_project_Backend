@@ -23,8 +23,8 @@ async function buildResearchFilter(query, { publishedOnly = false } = {}) {
   const clauses = [];
   if (publishedOnly) filter.status = 'published';
 
-  if (query.category) filter.category = query.category;
-  if (query.tag) filter.tags = query.tag;
+  if (typeof query.category === 'string' && query.category) filter.category = query.category;
+  if (typeof query.tag === 'string' && query.tag) filter.tags = query.tag;
   if (query.major) filter.major = new RegExp(escapeRegex(query.major), 'i');
   if (query.academicYear) filter.academicYear = String(query.academicYear).trim();
 

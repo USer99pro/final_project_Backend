@@ -1,5 +1,4 @@
 const fs = require('fs');
-const path = require('path');
 const express = require('express');
 const mongoose = require('mongoose');
 const User = require('../models/User');
@@ -10,13 +9,13 @@ const Tag = require('../models/Tag');
 const Category = require('../models/Category');
 const PdfFile = require('../models/PdfFile');
 const { authenticate, requireAdmin, revokeAllUserTokens } = require('../middleware/auth');
-const { uploadPdf, uploadDir, verifyPdfMagic } = require('../middleware/uploadPdf');
+const { uploadPdf, getUploadPath, verifyPdfMagic } = require('../middleware/uploadPdf');
 const { uploadSpreadsheet } = require('../middleware/uploadSpreadsheet');
 const { processUserImport, generateImportTemplate } = require('../utils/userImport');
 const { logAudit } = require('../utils/audit');
 const { logActivity } = require('../utils/activity');
 const { stripVersion } = require('../utils/serialize');
-const { buildResearchFilter } = require('../utils/searchFilter');
+const { buildResearchFilter, escapeRegex } = require('../utils/searchFilter');
 const { enrichContent } = require('../utils/paths');
 const { sendError } = require('../utils/sendError');
 const analyticsRoutes = require('./analyticsRoutes');
@@ -90,14 +89,14 @@ router.get('/dashboard', async (_req, res) => {
 router.get('/users', async (req, res) => {
   try {
     const filter = {};
-    if (req.query.role) filter.role = req.query.role;
+    if (typeof req.query.role === 'string' && req.query.role) filter.role = req.query.role;
     if (req.query.isActive) filter.isActive = req.query.isActive === 'true';
     if (req.query.major) filter.major = String(req.query.major).trim();
-    if (req.query.search) {
+    if (typeof req.query.search === 'string' && req.query.search) {
       filter.$or = [
-        { fullName: new RegExp(req.query.search, 'i') },
-        { email: new RegExp(req.query.search, 'i') },
-        { studentId: new RegExp(req.query.search, 'i') },
+        { fullName: new RegExp(escapeRegex(req.query.search), 'i') },
+        { email: new RegExp(escapeRegex(req.query.search), 'i') },
+        { studentId: new RegExp(escapeRegex(req.query.search), 'i') },
       ];
     }
     
@@ -376,13 +375,8 @@ async function adminResolveTagIds(tagValue, keywordValue, userId) {
 
 async function removePdfFile(filename) {
   if (!filename) return;
-  const filePath = path.join(uploadDir, filename);
-  // F10: Path-prefix guard — only allow deletions inside uploadDir
-  if (!path.resolve(filePath).startsWith(path.resolve(uploadDir) + path.sep) &&
-      path.resolve(filePath) !== path.resolve(uploadDir)) {
-    console.error('[removePdfFile] Blocked suspicious path:', filePath);
-    return;
-  }
+  const filePath = getUploadPath(filename);
+  if (!filePath) return;
   if (fs.existsSync(filePath)) {
     try { fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
   }
@@ -461,7 +455,9 @@ router.patch('/works/:id', uploadPdf.single('pdf'), verifyPdfMagic, async (req, 
 
     if (req.file) {
       await removePdfFile(item.pdfFilename);
-      const fileBuffer = fs.readFileSync(req.file.path);
+      const filePath = getUploadPath(req.file.filename);
+      if (!filePath) throw new Error('Invalid uploaded PDF path');
+      const fileBuffer = fs.readFileSync(filePath);
       await PdfFile.create({
         filename: req.file.filename,
         originalname: req.file.originalname,
@@ -469,7 +465,7 @@ router.patch('/works/:id', uploadPdf.single('pdf'), verifyPdfMagic, async (req, 
         size: req.file.size,
         data: fileBuffer,
       });
-      try { fs.unlinkSync(req.file.path); } catch (_) { /* ignore */ }
+      try { fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
       item.pdfFilename = req.file.filename;
       item.pdfOriginalName = req.file.originalname;
     }
@@ -541,7 +537,7 @@ router.delete('/works/:id', async (req, res) => {
 router.get('/audit-logs', async (req, res) => {
   try {
     const filter = {};
-    if (req.query.action) filter.action = req.query.action;
+    if (typeof req.query.action === 'string' && req.query.action) filter.action = req.query.action;
     const logs = await AuditLog.find(filter)
       .populate('userId', 'fullName email role')
       .sort({ createdAt: -1 })
