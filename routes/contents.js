@@ -1,5 +1,4 @@
 const fs = require('fs');
-const path = require('path');
 const express = require('express');
 const mongoose = require('mongoose');
 const Content = require('../models/Content');
@@ -9,7 +8,7 @@ const Tag = require('../models/Tag');
 const Category = require('../models/Category');
 const PdfFile = require('../models/PdfFile');
 const { authenticate, isOwnerOrAdmin } = require('../middleware/auth');
-const { uploadPdf, uploadDir } = require('../middleware/uploadPdf');
+const { uploadPdf, getUploadPath } = require('../middleware/uploadPdf');
 const { stripVersion } = require('../utils/serialize');
 const { enrichContent } = require('../utils/paths');
 const { logActivity } = require('../utils/activity');
@@ -128,7 +127,8 @@ async function validateRefs(categoryId, tagIds) {
 
 async function removePdfFile(filename) {
   if (!filename) return;
-  const filePath = path.join(uploadDir, filename);
+  const filePath = getUploadPath(filename);
+  if (!filePath) return;
   if (fs.existsSync(filePath)) {
     try {
       fs.unlinkSync(filePath);
@@ -191,7 +191,7 @@ router.get('/', async (req, res) => {
           { participants: req.user._id },
         ],
       };
-      if (req.query.status) filter.status = req.query.status;
+      if (typeof req.query.status === 'string' && req.query.status) filter.status = req.query.status;
     }
 
     const items = await Content.find(filter)
@@ -286,7 +286,9 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
     });
 
     if (req.file) {
-      const fileBuffer = fs.readFileSync(req.file.path);
+      const filePath = getUploadPath(req.file.filename);
+      if (!filePath) throw new Error('Invalid uploaded PDF path');
+      const fileBuffer = fs.readFileSync(filePath);
       await PdfFile.create({
         filename: req.file.filename,
         originalname: req.file.originalname,
@@ -295,7 +297,7 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
         data: fileBuffer,
       });
       try {
-        fs.unlinkSync(req.file.path);
+        fs.unlinkSync(filePath);
       } catch (_) {
         /* ignore */
       }
@@ -401,7 +403,9 @@ router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
     if (req.file) {
       await removePdfFile(item.pdfFilename);
 
-      const fileBuffer = fs.readFileSync(req.file.path);
+      const filePath = getUploadPath(req.file.filename);
+      if (!filePath) throw new Error('Invalid uploaded PDF path');
+      const fileBuffer = fs.readFileSync(filePath);
       await PdfFile.create({
         filename: req.file.filename,
         originalname: req.file.originalname,
@@ -410,7 +414,7 @@ router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
         data: fileBuffer,
       });
       try {
-        fs.unlinkSync(req.file.path);
+        fs.unlinkSync(filePath);
       } catch (_) {
         /* ignore */
       }

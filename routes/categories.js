@@ -9,7 +9,9 @@ const router = express.Router();
 /** GET /api/categories */
 router.get('/', async (req, res) => {
   try {
-    const filter = req.query.department ? { departments: req.query.department } : {};
+    const filter = typeof req.query.department === 'string' && req.query.department
+      ? { departments: req.query.department }
+      : {};
     const categories = await Category.find(filter).populate('departments', 'name').sort({ name: 1 });
     res.json(categories.map(stripVersion));
   } catch (err) {

@@ -14,6 +14,14 @@ const uploadDir = isServerless
   ? path.join('/tmp', 'uploads', 'pdfs')
   : path.join(__dirname, '..', 'uploads', 'pdfs');
 
+function getUploadPath(filename) {
+  if (typeof filename !== 'string' || !/^[a-zA-Z0-9_-]+\.pdf$/i.test(filename)) return null;
+  const filePath = path.resolve(uploadDir, filename);
+  const relativePath = path.relative(uploadDir, filePath);
+  if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) return null;
+  return filePath;
+}
+
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -84,4 +92,4 @@ function verifyPdfMagic(req, res, next) {
   next();
 }
 
-module.exports = { uploadPdf, uploadDir, verifyPdfMagic };
+module.exports = { uploadPdf, uploadDir, getUploadPath, verifyPdfMagic };

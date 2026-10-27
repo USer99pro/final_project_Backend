@@ -1,5 +1,4 @@
 const fs = require('fs');
-const path = require('path');
 const express = require('express');
 const Content = require('../models/Content');
 const Category = require('../models/Category');
@@ -8,7 +7,7 @@ const Advisor = require('../models/Advisor');
 const PdfFile = require('../models/PdfFile');
 const User = require('../models/User');
 const Department = require('../models/Department');
-const { uploadDir } = require('../middleware/uploadPdf');
+const { getUploadPath } = require('../middleware/uploadPdf');
 const { toPublicProject } = require('../utils/publicProject');
 const { buildResearchFilter, escapeRegex } = require('../utils/searchFilter');
 const { stripVersion } = require('../utils/serialize');
@@ -103,6 +102,8 @@ router.get('/projects/:id/file', async (req, res) => {
     const disposition = req.query.download === '1' ? 'attachment' : 'inline';
 
     // 1. Try to serve from MongoDB
+    const filePath = getUploadPath(item.pdfFilename);
+    if (!filePath) return res.status(404).json({ error: 'ไฟล์ไม่พบบนเซิร์ฟเวอร์' });
     const pdf = await PdfFile.findOne({ filename: item.pdfFilename });
     if (pdf) {
       res.setHeader('Content-Type', 'application/pdf');
@@ -114,7 +115,6 @@ router.get('/projects/:id/file', async (req, res) => {
     }
 
     // 2. Fallback to local disk
-    const filePath = path.join(uploadDir, item.pdfFilename);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'ไฟล์ไม่พบบนเซิร์ฟเวอร์' });
     }
@@ -173,7 +173,9 @@ router.get('/papers', async (req, res) => {
 
 router.get('/categories', async (req, res) => {
   try {
-    const filter = req.query.department ? { departments: req.query.department } : {};
+    const filter = typeof req.query.department === 'string' && req.query.department
+      ? { departments: req.query.department }
+      : {};
     res.json(await Category.find(filter).populate('departments', 'name').sort({ name: 1 }).lean());
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -183,8 +185,8 @@ router.get('/categories', async (req, res) => {
 router.get('/tags', async (req, res) => {
   try {
     const filter = {};
-    if (req.query.department) filter.department = req.query.department;
-    if (req.query.category) filter.category = req.query.category;
+    if (typeof req.query.department === 'string' && req.query.department) filter.department = req.query.department;
+    if (typeof req.query.category === 'string' && req.query.category) filter.category = req.query.category;
     res.json(await Tag.find(filter).populate('department', 'name').populate('category', 'name').sort({ name: 1 }).lean());
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -194,16 +196,16 @@ router.get('/tags', async (req, res) => {
 router.get('/advisors', async (req, res) => {
   try {
     const filter = { isActive: true };
-    const search = req.query.q || req.query.search;
+    const search = [req.query.q, req.query.search].find((value) => typeof value === 'string' && value);
 
-    if (req.query.department) {
+    if (typeof req.query.department === 'string' && req.query.department) {
       filter.$or = [
         { department: req.query.department },
         { departmentName: new RegExp(escapeRegex(req.query.department), 'i') },
       ];
     }
 
-    if (req.query.expertise) {
+    if (typeof req.query.expertise === 'string' && req.query.expertise) {
       filter.expertise = new RegExp(escapeRegex(req.query.expertise), 'i');
     }
 

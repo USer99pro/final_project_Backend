@@ -11,8 +11,8 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const filter = {};
-    if (req.query.category) filter.category = req.query.category;
-    if (req.query.department) filter.department = req.query.department;
+    if (typeof req.query.category === 'string' && req.query.category) filter.category = req.query.category;
+    if (typeof req.query.department === 'string' && req.query.department) filter.department = req.query.department;
     const tags = await Tag.find(filter).populate('department', 'name').populate('category', 'name').sort({ name: 1 });
     res.json(tags.map(stripVersion));
   } catch (err) {
@@ -24,6 +24,7 @@ router.use(authenticate);
 
 async function resolveScope({ department, category }) {
   if (category) {
+    if (typeof category !== 'string') return { error: 'ไม่พบประเภท' };
     const matchedCategory = await Category.findById(category);
     if (!matchedCategory) return { error: 'ไม่พบประเภท' };
     const matchedDepartments = matchedCategory.departments || [];
@@ -36,6 +37,7 @@ async function resolveScope({ department, category }) {
     }
     return { department: resolvedDepartment, category: matchedCategory._id };
   }
+  if (department && typeof department !== 'string') return { error: 'ไม่พบแผนก' };
   if (department && !(await Department.exists({ _id: department }))) return { error: 'ไม่พบแผนก' };
   return { department: department || null, category: null };
 }

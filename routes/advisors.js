@@ -20,18 +20,18 @@ router.get('/', async (req, res) => {
       filter.isActive = true; // default list active advisors
     }
 
-    if (req.query.department) {
+    if (typeof req.query.department === 'string' && req.query.department) {
       filter.$or = [
         { department: req.query.department },
         { departmentName: new RegExp(escapeRegex(req.query.department), 'i') },
       ];
     }
 
-    if (req.query.expertise) {
+    if (typeof req.query.expertise === 'string' && req.query.expertise) {
       filter.expertise = new RegExp(escapeRegex(req.query.expertise), 'i');
     }
 
-    const search = req.query.q || req.query.search;
+    const search = [req.query.q, req.query.search].find((value) => typeof value === 'string' && value);
     if (search) {
       const rx = new RegExp(escapeRegex(search), 'i');
       const searchClauses = [
@@ -145,7 +145,7 @@ router.post('/', authenticate, requireGraduate, async (req, res) => {
     let deptObjId = null;
     let resolvedDeptName = departmentName ? String(departmentName).trim() : '';
 
-    if (department) {
+    if (typeof department === 'string' && department) {
       let deptDoc = null;
       if (mongoose.Types.ObjectId.isValid(department)) {
         deptDoc = await Department.findById(department);
@@ -228,7 +228,7 @@ router.patch('/:id', authenticate, requireAdmin, async (req, res) => {
     if (isActive !== undefined) advisor.isActive = isActive === true || isActive === 'true';
 
     if (department !== undefined) {
-      if (department) {
+      if (typeof department === 'string' && department) {
         let deptDoc = null;
         if (mongoose.Types.ObjectId.isValid(department)) {
           deptDoc = await Department.findById(department);
