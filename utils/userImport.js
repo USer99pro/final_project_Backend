@@ -1,6 +1,6 @@
 'use strict';
 
-const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const { logAudit } = require('./audit');
@@ -110,40 +110,65 @@ function parseBoolean(val, defaultVal = true) {
 }
 
 /**
- * Parse buffer (CSV or Excel) into normalized raw objects
+ * Get a cell's display value as a clean string (handles richText, dates, etc.)
  */
-function parseSpreadsheetBuffer(buffer) {
-  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
-  if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+function getCellText(cell) {
+  if (cell === null || cell === undefined) return '';
+  const v = cell.value;
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'object' && v.richText) {
+    // Rich text — concatenate all runs
+    return v.richText.map((r) => r.text).join('');
+  }
+  if (v instanceof Date) return v.toISOString();
+  return String(v).trim();
+}
+
+/**
+ * Parse buffer (CSV or Excel) into normalized raw objects (async)
+ */
+async function parseSpreadsheetBuffer(buffer) {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+
+  if (!workbook.worksheets || workbook.worksheets.length === 0) {
     throw new Error('ไม่พบแผ่นงาน (Sheet) ในไฟล์ที่อัปโหลด');
   }
 
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+  const worksheet = workbook.worksheets[0];
 
-  if (!rawRows || rawRows.length === 0) {
+  // Extract header row (row 1)
+  const headerRow = worksheet.getRow(1);
+  const headers = []; // index -> canonical field name or null
+  headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+    headers[colNumber] = normalizeHeaderKey(getCellText(cell));
+  });
+
+  const rawRows = [];
+  worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (rowNumber === 1) return; // skip header
+
+    const normalized = { _rowNumber: rowNumber };
+    let hasData = false;
+
+    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      const field = headers[colNumber];
+      if (!field) return;
+      const val = getCellText(cell);
+      if (val !== '') hasData = true;
+      if (normalized[field] === undefined || val !== '') {
+        normalized[field] = val;
+      }
+    });
+
+    if (hasData) rawRows.push(normalized);
+  });
+
+  if (rawRows.length === 0) {
     throw new Error('ไฟล์ที่อัปโหลดไม่มีข้อมูลผู้ใช้ (แถวว่าง)');
   }
 
-  return rawRows.map((rawRow, index) => {
-    const rowNumber = index + 2; // Row 1 is header, data starts at row 2
-    const normalized = { _rowNumber: rowNumber };
-
-    for (const [key, val] of Object.entries(rawRow)) {
-      const canonicalKey = normalizeHeaderKey(key);
-      if (canonicalKey) {
-        const cleanVal = typeof val === 'string' ? val.trim() : val;
-        if (cleanVal !== '' && cleanVal !== undefined && cleanVal !== null) {
-          normalized[canonicalKey] = cleanVal;
-        } else if (normalized[canonicalKey] === undefined) {
-          normalized[canonicalKey] = '';
-        }
-      }
-    }
-
-    return normalized;
-  });
+  return rawRows;
 }
 
 /**
@@ -155,7 +180,7 @@ function parseSpreadsheetBuffer(buffer) {
  */
 async function processUserImport(buffer, options = {}) {
   const { dryRun = false, req = null, adminUser = null } = options;
-  const rows = parseSpreadsheetBuffer(buffer);
+  const rows = await parseSpreadsheetBuffer(buffer);
 
   const errors = [];
   const skipped = [];
@@ -458,9 +483,9 @@ async function processUserImport(buffer, options = {}) {
  * Generate CSV or Excel template file buffer for admin download
  *
  * @param {'xlsx'|'csv'} format
- * @returns {{ buffer: Buffer, filename: string, mimeType: string }}
+ * @returns {Promise<{ buffer: Buffer, filename: string, mimeType: string }>}
  */
-function generateImportTemplate(format = 'xlsx') {
+async function generateImportTemplate(format = 'xlsx') {
   const isCsv = String(format).toLowerCase() === 'csv';
 
   const templateData = [
@@ -486,17 +511,22 @@ function generateImportTemplate(format = 'xlsx') {
     },
   ];
 
-  const worksheet = XLSX.utils.json_to_sheet(templateData, {
-    header: ['studentId', 'fullName', 'citizenId', 'email', 'password', 'major', 'phone', 'role'],
-  });
-
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Users');
+  const COLUMNS = ['studentId', 'fullName', 'citizenId', 'email', 'password', 'major', 'phone', 'role'];
 
   if (isCsv) {
-    const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
-    // Add UTF-8 BOM so Excel opens Thai characters correctly in CSV
-    const buffer = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(csvOutput, 'utf8')]);
+    // Build UTF-8 BOM CSV so Excel opens Thai characters correctly
+    const escape = (v) => {
+      const s = v == null ? '' : String(v);
+      return s.includes(',') || s.includes('"') || s.includes('\n')
+        ? `"${s.replace(/"/g, '""')}"`
+        : s;
+    };
+    const lines = [
+      COLUMNS.join(','),
+      ...templateData.map((row) => COLUMNS.map((k) => escape(row[k])).join(',')),
+    ];
+    const csvText = lines.join('\r\n');
+    const buffer = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(csvText, 'utf8')]);
     return {
       buffer,
       filename: 'user_import_template.csv',
@@ -504,9 +534,16 @@ function generateImportTemplate(format = 'xlsx') {
     };
   }
 
-  const xlsxBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  // Build .xlsx with ExcelJS
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Users');
+
+  worksheet.columns = COLUMNS.map((key) => ({ header: key, key, width: 24 }));
+  worksheet.addRows(templateData);
+
+  const xlsxBuffer = await workbook.xlsx.writeBuffer();
   return {
-    buffer: xlsxBuffer,
+    buffer: Buffer.from(xlsxBuffer),
     filename: 'user_import_template.xlsx',
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   };
