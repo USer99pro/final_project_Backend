@@ -45,6 +45,20 @@ const uploadPdf = multer({
   limits: { fileSize: 15 * 1024 * 1024 },
 });
 
+const uploadRoot = path.resolve(uploadDir);
+const uploadRootWithSep = `${uploadRoot}${path.sep}`;
+
+function resolveSafeUploadPath(filePath) {
+  if (typeof filePath !== 'string' || !filePath.trim()) return null;
+  const resolvedPath = path.resolve(filePath);
+  if (!resolvedPath.startsWith(uploadRootWithSep)) return null;
+  return resolvedPath;
+}
+
+function removeUploadedFile(filePath) {
+  try { fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
+}
+
 /**
  * F6: Magic-byte verification middleware.
  * Runs after Multer writes the file to disk and checks that the first 4 bytes
@@ -59,7 +73,10 @@ const uploadPdf = multer({
 function verifyPdfMagic(req, res, next) {
   if (!req.file) return next(); // No file uploaded — let route handle it
 
-  const filePath = req.file.path;
+  const filePath = resolveSafeUploadPath(req.file.path);
+  if (!filePath) {
+    return res.status(400).json({ error: 'ตำแหน่งไฟล์อัปโหลดไม่ถูกต้อง' });
+  }
   let fd;
   try {
     // Read first 4 bytes only
@@ -72,12 +89,12 @@ function verifyPdfMagic(req, res, next) {
     // %PDF magic: 25 50 44 46
     if (buf[0] !== 0x25 || buf[1] !== 0x50 || buf[2] !== 0x44 || buf[3] !== 0x46) {
       // Delete the non-PDF file immediately
-      try { fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
+      removeUploadedFile(filePath);
       return res.status(400).json({ error: 'ไฟล์ที่อัปโหลดไม่ใช่ PDF จริง (magic bytes ไม่ตรง)' });
     }
   } catch (err) {
     if (fd !== undefined) { try { fs.closeSync(fd); } catch (_) { /* ignore */ } }
-    try { fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
+    removeUploadedFile(filePath);
     return res.status(500).json({ error: 'ไม่สามารถตรวจสอบไฟล์ได้' });
   }
 

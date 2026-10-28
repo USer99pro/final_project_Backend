@@ -5,6 +5,7 @@ const Content = require('../models/Content');
 const Advisor = require('../models/Advisor');
 const Department = require('../models/Department');
 const { authenticate, requireAdmin, requireGraduate, revokeAllUserTokens } = require('../middleware/auth');
+const { isValidEmailAddress } = require('../utils/email');
 const { stripVersion } = require('../utils/serialize');
 const { escapeRegex } = require('../utils/searchFilter');
 const { sendError } = require('../utils/sendError');
@@ -282,8 +283,7 @@ router.post('/', requireAdmin, async (req, res) => {
     }
     const cleanEmail = email && String(email).trim() ? String(email).trim().toLowerCase() : '';
     if (cleanEmail) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(cleanEmail)) {
+      if (!isValidEmailAddress(cleanEmail)) {
         return res.status(400).json({ error: 'รูปแบบอีเมลไม่ถูกต้อง' });
       }
     }
@@ -328,8 +328,7 @@ router.patch('/:id', async (req, res) => {
     if (email !== undefined) {
       const cleanEmail = email && String(email).trim() ? String(email).trim().toLowerCase() : '';
       if (cleanEmail) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(cleanEmail)) {
+        if (!isValidEmailAddress(cleanEmail)) {
           return res.status(400).json({ error: 'รูปแบบอีเมลไม่ถูกต้อง' });
         }
         user.email = cleanEmail;
