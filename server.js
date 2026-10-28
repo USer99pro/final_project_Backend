@@ -24,6 +24,7 @@ const advisorsRouter = require('./routes/advisors');
 const IS_PROD = process.env.NODE_ENV === 'production';
 
 const app = express();
+app.disable('x-powered-by');
 const PORT = Number(process.env.PORT) || 3000;
 
 // Trust reverse proxy (e.g. Render, Heroku, Cloudflare) to correctly identify client IP in rate limiting

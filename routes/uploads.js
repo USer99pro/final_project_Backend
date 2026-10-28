@@ -1,3 +1,5 @@
+const { fileDownloadLimiter } = require('../middleware/rateLimiter');
+const { getSafeUploadPath } = require('../utils/safePath');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
@@ -93,17 +95,17 @@ router.get('/papers/:id/file', async (req, res) => {
     }
 
     // 2. Fallback to local disk
-    const filePath = path.join(uploadDir, item.pdfFilename);
-    if (!fs.existsSync(filePath)) {
+    const safe = getSafeUploadPath(uploadDir, item.pdfFilename);
+    if (!safe || !fs.existsSync(safe.safePath)) {
       return res.status(404).json({ error: 'ไฟล์ไม่พบบนเซิร์ฟเวอร์' });
     }
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
-      `inline; filename="${encodeURIComponent(item.pdfOriginalName || item.pdfFilename)}"`
+      `inline; filename="${encodeURIComponent(item.pdfOriginalName || safe.safeName)}"`
     );
-    res.sendFile(path.resolve(filePath), (err) => {
+    res.sendFile(safe.safeName, { root: safe.baseDir }, (err) => {
       if (err) {
         console.error('[SendFile Error]', err);
         if (!res.headersSent) {

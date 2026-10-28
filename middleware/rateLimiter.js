@@ -4,8 +4,11 @@
  * rateLimiter.js
  * Rate limiting middleware using express-rate-limit.
  *
- * - globalLimiter  : 100 req / 15 min per IP  (applied app-wide)
- * - authLimiter    : 20  req / 15 min per IP  (login, register, forgot-password)
+ * - globalLimiter       : 1000 req / 15 min per IP  (applied app-wide)
+ * - authLimiter         : 30   req / 15 min per IP  (login, register, forgot-password)
+ * - analyticsLimiter    : 300  req / 15 min per IP  (analytics tracking)
+ * - fileDownloadLimiter : 120  req / 15 min per IP  (file download/streaming)
+ * - fileUploadLimiter   : 60   req / 15 min per IP  (file upload, update, deletion)
  */
 
 const rateLimit = require('express-rate-limit');
@@ -13,7 +16,7 @@ const rateLimit = require('express-rate-limit');
 /** Generic JSON error handler for rate limit responses */
 function rateLimitHandler(req, res) {
   res.status(429).json({
-    error: 'Too many requests â€” please try again later.',
+    error: 'Too many requests — please try again later.',
     retryAfter: Math.ceil(req.rateLimit.resetTime / 1000),
   });
 }
@@ -57,4 +60,34 @@ const analyticsLimiter = rateLimit({
   handler: rateLimitHandler,
 });
 
-module.exports = { globalLimiter, authLimiter, analyticsLimiter };
+/**
+ * File download limiter — protects file retrieval endpoints against DoS.
+ * Default: 120 requests per 15 minutes per IP.
+ */
+const fileDownloadLimiter = rateLimit({
+  windowMs: Number(process.env.RATE_LIMIT_DOWNLOAD_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_DOWNLOAD_MAX) || 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+});
+
+/**
+ * File upload/modification limiter — protects upload, edit, delete operations.
+ * Default: 60 requests per 15 minutes per IP.
+ */
+const fileUploadLimiter = rateLimit({
+  windowMs: Number(process.env.RATE_LIMIT_UPLOAD_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_UPLOAD_MAX) || 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+});
+
+module.exports = {
+  globalLimiter,
+  authLimiter,
+  analyticsLimiter,
+  fileDownloadLimiter,
+  fileUploadLimiter,
+};

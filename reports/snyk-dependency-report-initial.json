@@ -1,0 +1,820 @@
+{
+  "vulnerabilities": [
+    {
+      "id": "SNYK-JS-INFLIGHT-6095116",
+      "title": "Missing Release of Resource after Effective Lifetime",
+      "CVSSv3": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H/E:P",
+      "credit": [
+        "jkomyno"
+      ],
+      "semver": {
+        "vulnerable": [
+          "*"
+        ]
+      },
+      "exploit": "Proof of Concept",
+      "fixedIn": [],
+      "patches": [],
+      "insights": {
+        "triageAdvice": null
+      },
+      "language": "js",
+      "severity": "medium",
+      "cvssScore": 6.2,
+      "functions": [],
+      "malicious": false,
+      "isDisputed": false,
+      "moduleName": "inflight",
+      "references": [
+        {
+          "url": "https://github.com/isaacs/inflight/issues/5",
+          "title": "GitHub Issue"
+        },
+        {
+          "url": "https://github.com/logdna/logdna-agent/pull/157",
+          "title": "GitHub PR"
+        }
+      ],
+      "cvssDetails": [],
+      "cvssSources": [
+        {
+          "type": "primary",
+          "vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H/E:P",
+          "assigner": "Snyk",
+          "severity": "medium",
+          "baseScore": 6.2,
+          "cvssVersion": "3.1",
+          "modificationTime": "2026-05-21T02:01:45.056683Z"
+        }
+      ],
+      "description": "## Overview\n\nAffected versions of this package are vulnerable to Missing Release of Resource after Effective Lifetime via the `makeres` function due to improperly deleting keys from the `reqs` object after execution of callbacks. This behavior causes the keys to remain in the `reqs` object, which leads to resource exhaustion.\r\n\r\nExploiting this vulnerability results in crashing the `node` process or in the application crash.\r\n\r\n**Note:**\r\nThis library is not maintained, and currently, there is no fix for this issue. To overcome this vulnerability, several dependent packages have eliminated the use of this library.\r\n\r\nTo trigger the memory leak, an attacker would need to have the ability to execute or influence the asynchronous operations that use the inflight module within the application. This typically requires access to the internal workings of the server or application, which is not commonly exposed to remote users. Therefore, “Attack vector” is marked as “Local”.\n## PoC\n```js\r\nconst inflight = require('inflight');\r\n\r\nfunction testInflight() {\r\n  let i = 0;\r\n  function scheduleNext() {\r\n    let key = `key-${i++}`;\r\n    const callback = () => {\r\n    };\r\n    for (let j = 0; j < 1000000; j++) {\r\n      inflight(key, callback);\r\n    }\r\n\r\n    setImmediate(scheduleNext);\r\n  }\r\n\r\n\r\n  if (i % 100 === 0) {\r\n    console.log(process.memoryUsage());\r\n  }\r\n\r\n  scheduleNext();\r\n}\r\n\r\ntestInflight();\r\n```\n## Remediation\nThere is no fixed version for `inflight`.\n## References\n- [GitHub Issue](https://github.com/isaacs/inflight/issues/5)\n- [GitHub PR](https://github.com/logdna/logdna-agent/pull/157)\n",
+      "epssDetails": null,
+      "identifiers": {
+        "CVE": [],
+        "CWE": [
+          "CWE-772"
+        ]
+      },
+      "packageName": "inflight",
+      "proprietary": false,
+      "creationTime": "2023-11-30T12:51:43.483198Z",
+      "functions_new": [],
+      "alternativeIds": [],
+      "disclosureTime": "2023-11-28T12:47:27Z",
+      "exploitDetails": {
+        "sources": [
+          "Snyk"
+        ],
+        "maturityLevels": [
+          {
+            "type": "secondary",
+            "level": "Proof of Concept",
+            "format": "CVSSv3"
+          },
+          {
+            "type": "primary",
+            "level": "Proof of Concept",
+            "format": "CVSSv4"
+          }
+        ]
+      },
+      "packageManager": "npm",
+      "publicationTime": "2023-11-30T12:52:55.469185Z",
+      "severityBasedOn": "CVSS",
+      "modificationTime": "2026-05-21T02:01:45.056683Z",
+      "socialTrendAlert": false,
+      "severityWithCritical": "medium",
+      "from": [
+        "package.json@*",
+        "exceljs@4.4.0",
+        "archiver@5.3.2",
+        "archiver-utils@2.1.0",
+        "glob@7.2.3",
+        "inflight@1.0.6"
+      ],
+      "upgradePath": [],
+      "isUpgradable": false,
+      "isPatchable": false,
+      "name": "inflight",
+      "version": "1.0.6"
+    },
+    {
+      "id": "SNYK-JS-INFLIGHT-6095116",
+      "title": "Missing Release of Resource after Effective Lifetime",
+      "CVSSv3": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H/E:P",
+      "credit": [
+        "jkomyno"
+      ],
+      "semver": {
+        "vulnerable": [
+          "*"
+        ]
+      },
+      "exploit": "Proof of Concept",
+      "fixedIn": [],
+      "patches": [],
+      "insights": {
+        "triageAdvice": null
+      },
+      "language": "js",
+      "severity": "medium",
+      "cvssScore": 6.2,
+      "functions": [],
+      "malicious": false,
+      "isDisputed": false,
+      "moduleName": "inflight",
+      "references": [
+        {
+          "url": "https://github.com/isaacs/inflight/issues/5",
+          "title": "GitHub Issue"
+        },
+        {
+          "url": "https://github.com/logdna/logdna-agent/pull/157",
+          "title": "GitHub PR"
+        }
+      ],
+      "cvssDetails": [],
+      "cvssSources": [
+        {
+          "type": "primary",
+          "vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H/E:P",
+          "assigner": "Snyk",
+          "severity": "medium",
+          "baseScore": 6.2,
+          "cvssVersion": "3.1",
+          "modificationTime": "2026-05-21T02:01:45.056683Z"
+        }
+      ],
+      "description": "## Overview\n\nAffected versions of this package are vulnerable to Missing Release of Resource after Effective Lifetime via the `makeres` function due to improperly deleting keys from the `reqs` object after execution of callbacks. This behavior causes the keys to remain in the `reqs` object, which leads to resource exhaustion.\r\n\r\nExploiting this vulnerability results in crashing the `node` process or in the application crash.\r\n\r\n**Note:**\r\nThis library is not maintained, and currently, there is no fix for this issue. To overcome this vulnerability, several dependent packages have eliminated the use of this library.\r\n\r\nTo trigger the memory leak, an attacker would need to have the ability to execute or influence the asynchronous operations that use the inflight module within the application. This typically requires access to the internal workings of the server or application, which is not commonly exposed to remote users. Therefore, “Attack vector” is marked as “Local”.\n## PoC\n```js\r\nconst inflight = require('inflight');\r\n\r\nfunction testInflight() {\r\n  let i = 0;\r\n  function scheduleNext() {\r\n    let key = `key-${i++}`;\r\n    const callback = () => {\r\n    };\r\n    for (let j = 0; j < 1000000; j++) {\r\n      inflight(key, callback);\r\n    }\r\n\r\n    setImmediate(scheduleNext);\r\n  }\r\n\r\n\r\n  if (i % 100 === 0) {\r\n    console.log(process.memoryUsage());\r\n  }\r\n\r\n  scheduleNext();\r\n}\r\n\r\ntestInflight();\r\n```\n## Remediation\nThere is no fixed version for `inflight`.\n## References\n- [GitHub Issue](https://github.com/isaacs/inflight/issues/5)\n- [GitHub PR](https://github.com/logdna/logdna-agent/pull/157)\n",
+      "epssDetails": null,
+      "identifiers": {
+        "CVE": [],
+        "CWE": [
+          "CWE-772"
+        ]
+      },
+      "packageName": "inflight",
+      "proprietary": false,
+      "creationTime": "2023-11-30T12:51:43.483198Z",
+      "functions_new": [],
+      "alternativeIds": [],
+      "disclosureTime": "2023-11-28T12:47:27Z",
+      "exploitDetails": {
+        "sources": [
+          "Snyk"
+        ],
+        "maturityLevels": [
+          {
+            "type": "secondary",
+            "level": "Proof of Concept",
+            "format": "CVSSv3"
+          },
+          {
+            "type": "primary",
+            "level": "Proof of Concept",
+            "format": "CVSSv4"
+          }
+        ]
+      },
+      "packageManager": "npm",
+      "publicationTime": "2023-11-30T12:52:55.469185Z",
+      "severityBasedOn": "CVSS",
+      "modificationTime": "2026-05-21T02:01:45.056683Z",
+      "socialTrendAlert": false,
+      "severityWithCritical": "medium",
+      "from": [
+        "package.json@*",
+        "exceljs@4.4.0",
+        "archiver@5.3.2",
+        "zip-stream@4.1.1",
+        "archiver-utils@3.0.4",
+        "glob@7.2.3",
+        "inflight@1.0.6"
+      ],
+      "upgradePath": [],
+      "isUpgradable": false,
+      "isPatchable": false,
+      "name": "inflight",
+      "version": "1.0.6"
+    },
+    {
+      "id": "SNYK-JS-QS-21755395",
+      "title": "Improper Encoding or Escaping of Output",
+      "CVSSv3": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N/E:P",
+      "credit": [
+        "DucMinhNe"
+      ],
+      "semver": {
+        "vulnerable": [
+          ">=6.12.0 <6.16.2"
+        ]
+      },
+      "exploit": "Proof of Concept",
+      "fixedIn": [
+        "6.16.2"
+      ],
+      "patches": [],
+      "insights": {
+        "triageAdvice": null
+      },
+      "language": "js",
+      "severity": "medium",
+      "cvssScore": 6.3,
+      "functions": [],
+      "malicious": false,
+      "isDisputed": false,
+      "moduleName": "qs",
+      "references": [
+        {
+          "url": "https://github.com/ljharb/qs/security/advisories/GHSA-w4cr-vjpx-p82q",
+          "title": "GitHub Advisory"
+        },
+        {
+          "url": "https://github.com/ljharb/qs/commit/234d5051f5071efaa025a7ca9e4d34a56a460a1b",
+          "title": "GitHub Commit"
+        },
+        {
+          "url": "https://github.com/ljharb/qs/commit/5d3b1b9ec6afd0cfc760c8e12862873789a32fc8",
+          "title": "GitHub Commit"
+        },
+        {
+          "url": "https://github.com/ljharb/qs/issues/626",
+          "title": "GitHub Issue"
+        },
+        {
+          "url": "https://github.com/ljharb/qs/pull/561",
+          "title": "GitHub PR"
+        }
+      ],
+      "cvssDetails": [],
+      "cvssSources": [
+        {
+          "type": "primary",
+          "vector": "CVSS:4.0/AV:N/AC:H/AT:N/PR:N/UI:N/VC:N/VI:L/VA:N/SC:N/SI:N/SA:N/E:P",
+          "assigner": "Snyk",
+          "severity": "medium",
+          "baseScore": 6.3,
+          "cvssVersion": "4.0",
+          "modificationTime": "2026-10-28T15:33:45.908187Z"
+        },
+        {
+          "type": "secondary",
+          "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N/E:P",
+          "assigner": "Snyk",
+          "severity": "low",
+          "baseScore": 3.7,
+          "cvssVersion": "3.1",
+          "modificationTime": "2026-10-28T15:33:45.908187Z"
+        }
+      ],
+      "description": "## Overview\n[qs](https://www.npmjs.com/package/qs) is a querystring parser that supports nesting and arrays, with a depth limit.\n\nAffected versions of this package are vulnerable to Improper Encoding or Escaping of Output via the `stringify` function when the `allowEmptyArrays` option is enabled. When an object key contains special characters (such as `&`, `=`, or `#`) and its value is an empty array, the key is returned without encoding, allowing an attacker who controls a key name to inject arbitrary query-string parameters or URL fragments into the serialized output. A consumer that parses the resulting string will see attacker-controlled key-value pairs that were not present in the original object.\n## PoC\n```js\r\nvar qs = require(\"qs\");\r\n\r\nvar query = qs.stringify({ q: \"hi\", \"x&apiKey=evil&y\": [] }, { allowEmptyArrays: true });\r\n// \"q=hi&x&apiKey=evil&y[]\"\r\nqs.parse(query);\r\n// { q: \"hi\", x: \"\", apiKey: \"evil\", y: [\"\"] }\r\n\r\nqs.stringify({ \"x#\": [], z: \"1\" }, { allowEmptyArrays: true });\r\n// \"x#[]&z=1\": in a URL, everything after \"#\" becomes the fragment\r\n```\r\n\r\n**Note:** The PoC uses the `qs` npm package with the `allowEmptyArrays` option and states no specific runtime version or operating system.\n## Remediation\nUpgrade `qs` to version 6.16.2 or higher.\n## References\n- [GitHub Advisory](https://github.com/ljharb/qs/security/advisories/GHSA-w4cr-vjpx-p82q)\n- [GitHub Commit](https://github.com/ljharb/qs/commit/234d5051f5071efaa025a7ca9e4d34a56a460a1b)\n- [GitHub Commit](https://github.com/ljharb/qs/commit/5d3b1b9ec6afd0cfc760c8e12862873789a32fc8)\n- [GitHub Issue](https://github.com/ljharb/qs/issues/626)\n- [GitHub PR](https://github.com/ljharb/qs/pull/561)\n",
+      "epssDetails": {
+        "percentile": "0.21119",
+        "probability": "0.00286",
+        "modelVersion": "v2026.06.15"
+      },
+      "identifiers": {
+        "CVE": [
+          "CVE-2026-110910"
+        ],
+        "CWE": [
+          "CWE-116"
+        ],
+        "GHSA": [
+          "GHSA-w4cr-vjpx-p82q"
+        ]
+      },
+      "packageName": "qs",
+      "proprietary": false,
+      "creationTime": "2026-10-27T14:36:38.486792Z",
+      "functions_new": [],
+      "alternativeIds": [],
+      "disclosureTime": "2026-10-27T08:31:46Z",
+      "exploitDetails": {
+        "sources": [
+          "Snyk"
+        ],
+        "maturityLevels": [
+          {
+            "type": "secondary",
+            "level": "Proof of Concept",
+            "format": "CVSSv3"
+          },
+          {
+            "type": "primary",
+            "level": "Proof of Concept",
+            "format": "CVSSv4"
+          }
+        ]
+      },
+      "packageManager": "npm",
+      "publicationTime": "2026-10-27T14:36:38.663296Z",
+      "severityBasedOn": "CVSS",
+      "modificationTime": "2026-10-28T15:33:45.908187Z",
+      "socialTrendAlert": false,
+      "severityWithCritical": "medium",
+      "from": [
+        "package.json@*",
+        "express@4.22.3",
+        "qs@6.16.1"
+      ],
+      "upgradePath": [
+        false,
+        "express@4.22.3",
+        "qs@6.16.2"
+      ],
+      "isUpgradable": true,
+      "isPatchable": false,
+      "name": "qs",
+      "version": "6.16.1"
+    },
+    {
+      "id": "SNYK-JS-QS-21755395",
+      "title": "Improper Encoding or Escaping of Output",
+      "CVSSv3": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N/E:P",
+      "credit": [
+        "DucMinhNe"
+      ],
+      "semver": {
+        "vulnerable": [
+          ">=6.12.0 <6.16.2"
+        ]
+      },
+      "exploit": "Proof of Concept",
+      "fixedIn": [
+        "6.16.2"
+      ],
+      "patches": [],
+      "insights": {
+        "triageAdvice": null
+      },
+      "language": "js",
+      "severity": "medium",
+      "cvssScore": 6.3,
+      "functions": [],
+      "malicious": false,
+      "isDisputed": false,
+      "moduleName": "qs",
+      "references": [
+        {
+          "url": "https://github.com/ljharb/qs/security/advisories/GHSA-w4cr-vjpx-p82q",
+          "title": "GitHub Advisory"
+        },
+        {
+          "url": "https://github.com/ljharb/qs/commit/234d5051f5071efaa025a7ca9e4d34a56a460a1b",
+          "title": "GitHub Commit"
+        },
+        {
+          "url": "https://github.com/ljharb/qs/commit/5d3b1b9ec6afd0cfc760c8e12862873789a32fc8",
+          "title": "GitHub Commit"
+        },
+        {
+          "url": "https://github.com/ljharb/qs/issues/626",
+          "title": "GitHub Issue"
+        },
+        {
+          "url": "https://github.com/ljharb/qs/pull/561",
+          "title": "GitHub PR"
+        }
+      ],
+      "cvssDetails": [],
+      "cvssSources": [
+        {
+          "type": "primary",
+          "vector": "CVSS:4.0/AV:N/AC:H/AT:N/PR:N/UI:N/VC:N/VI:L/VA:N/SC:N/SI:N/SA:N/E:P",
+          "assigner": "Snyk",
+          "severity": "medium",
+          "baseScore": 6.3,
+          "cvssVersion": "4.0",
+          "modificationTime": "2026-10-28T15:33:45.908187Z"
+        },
+        {
+          "type": "secondary",
+          "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N/E:P",
+          "assigner": "Snyk",
+          "severity": "low",
+          "baseScore": 3.7,
+          "cvssVersion": "3.1",
+          "modificationTime": "2026-10-28T15:33:45.908187Z"
+        }
+      ],
+      "description": "## Overview\n[qs](https://www.npmjs.com/package/qs) is a querystring parser that supports nesting and arrays, with a depth limit.\n\nAffected versions of this package are vulnerable to Improper Encoding or Escaping of Output via the `stringify` function when the `allowEmptyArrays` option is enabled. When an object key contains special characters (such as `&`, `=`, or `#`) and its value is an empty array, the key is returned without encoding, allowing an attacker who controls a key name to inject arbitrary query-string parameters or URL fragments into the serialized output. A consumer that parses the resulting string will see attacker-controlled key-value pairs that were not present in the original object.\n## PoC\n```js\r\nvar qs = require(\"qs\");\r\n\r\nvar query = qs.stringify({ q: \"hi\", \"x&apiKey=evil&y\": [] }, { allowEmptyArrays: true });\r\n// \"q=hi&x&apiKey=evil&y[]\"\r\nqs.parse(query);\r\n// { q: \"hi\", x: \"\", apiKey: \"evil\", y: [\"\"] }\r\n\r\nqs.stringify({ \"x#\": [], z: \"1\" }, { allowEmptyArrays: true });\r\n// \"x#[]&z=1\": in a URL, everything after \"#\" becomes the fragment\r\n```\r\n\r\n**Note:** The PoC uses the `qs` npm package with the `allowEmptyArrays` option and states no specific runtime version or operating system.\n## Remediation\nUpgrade `qs` to version 6.16.2 or higher.\n## References\n- [GitHub Advisory](https://github.com/ljharb/qs/security/advisories/GHSA-w4cr-vjpx-p82q)\n- [GitHub Commit](https://github.com/ljharb/qs/commit/234d5051f5071efaa025a7ca9e4d34a56a460a1b)\n- [GitHub Commit](https://github.com/ljharb/qs/commit/5d3b1b9ec6afd0cfc760c8e12862873789a32fc8)\n- [GitHub Issue](https://github.com/ljharb/qs/issues/626)\n- [GitHub PR](https://github.com/ljharb/qs/pull/561)\n",
+      "epssDetails": {
+        "percentile": "0.21119",
+        "probability": "0.00286",
+        "modelVersion": "v2026.06.15"
+      },
+      "identifiers": {
+        "CVE": [
+          "CVE-2026-110910"
+        ],
+        "CWE": [
+          "CWE-116"
+        ],
+        "GHSA": [
+          "GHSA-w4cr-vjpx-p82q"
+        ]
+      },
+      "packageName": "qs",
+      "proprietary": false,
+      "creationTime": "2026-10-27T14:36:38.486792Z",
+      "functions_new": [],
+      "alternativeIds": [],
+      "disclosureTime": "2026-10-27T08:31:46Z",
+      "exploitDetails": {
+        "sources": [
+          "Snyk"
+        ],
+        "maturityLevels": [
+          {
+            "type": "secondary",
+            "level": "Proof of Concept",
+            "format": "CVSSv3"
+          },
+          {
+            "type": "primary",
+            "level": "Proof of Concept",
+            "format": "CVSSv4"
+          }
+        ]
+      },
+      "packageManager": "npm",
+      "publicationTime": "2026-10-27T14:36:38.663296Z",
+      "severityBasedOn": "CVSS",
+      "modificationTime": "2026-10-28T15:33:45.908187Z",
+      "socialTrendAlert": false,
+      "severityWithCritical": "medium",
+      "from": [
+        "package.json@*",
+        "express@4.22.3",
+        "body-parser@1.20.9",
+        "qs@6.16.1"
+      ],
+      "upgradePath": [
+        false,
+        "express@4.22.3",
+        "body-parser@1.20.9",
+        "qs@6.16.2"
+      ],
+      "isUpgradable": true,
+      "isPatchable": false,
+      "name": "qs",
+      "version": "6.16.1"
+    }
+  ],
+  "ok": false,
+  "dependencyCount": 208,
+  "org": "user99pro",
+  "policy": "# Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.\nversion: v1.25.1\nignore: {}\npatch: {}\n",
+  "isPrivate": true,
+  "licensesPolicy": {
+    "severities": {},
+    "orgLicenseRules": {
+      "AGPL-1.0": {
+        "licenseType": "AGPL-1.0",
+        "severity": "high",
+        "instructions": ""
+      },
+      "AGPL-3.0": {
+        "licenseType": "AGPL-3.0",
+        "severity": "high",
+        "instructions": ""
+      },
+      "Artistic-1.0": {
+        "licenseType": "Artistic-1.0",
+        "severity": "medium",
+        "instructions": ""
+      },
+      "Artistic-2.0": {
+        "licenseType": "Artistic-2.0",
+        "severity": "medium",
+        "instructions": ""
+      },
+      "CDDL-1.0": {
+        "licenseType": "CDDL-1.0",
+        "severity": "medium",
+        "instructions": ""
+      },
+      "CPOL-1.02": {
+        "licenseType": "CPOL-1.02",
+        "severity": "high",
+        "instructions": ""
+      },
+      "EPL-1.0": {
+        "licenseType": "EPL-1.0",
+        "severity": "medium",
+        "instructions": ""
+      },
+      "GPL-2.0": {
+        "licenseType": "GPL-2.0",
+        "severity": "high",
+        "instructions": ""
+      },
+      "GPL-3.0": {
+        "licenseType": "GPL-3.0",
+        "severity": "high",
+        "instructions": ""
+      },
+      "LGPL-2.0": {
+        "licenseType": "LGPL-2.0",
+        "severity": "medium",
+        "instructions": ""
+      },
+      "LGPL-2.1": {
+        "licenseType": "LGPL-2.1",
+        "severity": "medium",
+        "instructions": ""
+      },
+      "LGPL-3.0": {
+        "licenseType": "LGPL-3.0",
+        "severity": "medium",
+        "instructions": ""
+      },
+      "MPL-1.1": {
+        "licenseType": "MPL-1.1",
+        "severity": "medium",
+        "instructions": ""
+      },
+      "MPL-2.0": {
+        "licenseType": "MPL-2.0",
+        "severity": "medium",
+        "instructions": ""
+      },
+      "MS-RL": {
+        "licenseType": "MS-RL",
+        "severity": "medium",
+        "instructions": ""
+      },
+      "SimPL-2.0": {
+        "licenseType": "SimPL-2.0",
+        "severity": "high",
+        "instructions": ""
+      }
+    }
+  },
+  "packageManager": "npm",
+  "ignoreSettings": {
+    "adminOnly": false,
+    "reasonRequired": false,
+    "disregardFilesystemIgnores": false,
+    "autoApproveIgnores": false,
+    "approvalWorkflowEnabled": false
+  },
+  "summary": "4 vulnerable dependency paths",
+  "remediation": {
+    "unresolved": [
+      {
+        "id": "SNYK-JS-INFLIGHT-6095116",
+        "title": "Missing Release of Resource after Effective Lifetime",
+        "CVSSv3": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H/E:P",
+        "credit": [
+          "jkomyno"
+        ],
+        "semver": {
+          "vulnerable": [
+            "*"
+          ]
+        },
+        "exploit": "Proof of Concept",
+        "fixedIn": [],
+        "patches": [],
+        "insights": {
+          "triageAdvice": null
+        },
+        "language": "js",
+        "severity": "medium",
+        "cvssScore": 6.2,
+        "functions": [],
+        "malicious": false,
+        "isDisputed": false,
+        "moduleName": "inflight",
+        "references": [
+          {
+            "url": "https://github.com/isaacs/inflight/issues/5",
+            "title": "GitHub Issue"
+          },
+          {
+            "url": "https://github.com/logdna/logdna-agent/pull/157",
+            "title": "GitHub PR"
+          }
+        ],
+        "cvssDetails": [],
+        "cvssSources": [
+          {
+            "type": "primary",
+            "vector": "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H/E:P",
+            "assigner": "Snyk",
+            "severity": "medium",
+            "baseScore": 6.2,
+            "cvssVersion": "3.1",
+            "modificationTime": "2026-05-21T02:01:45.056683Z"
+          }
+        ],
+        "description": "## Overview\n\nAffected versions of this package are vulnerable to Missing Release of Resource after Effective Lifetime via the `makeres` function due to improperly deleting keys from the `reqs` object after execution of callbacks. This behavior causes the keys to remain in the `reqs` object, which leads to resource exhaustion.\r\n\r\nExploiting this vulnerability results in crashing the `node` process or in the application crash.\r\n\r\n**Note:**\r\nThis library is not maintained, and currently, there is no fix for this issue. To overcome this vulnerability, several dependent packages have eliminated the use of this library.\r\n\r\nTo trigger the memory leak, an attacker would need to have the ability to execute or influence the asynchronous operations that use the inflight module within the application. This typically requires access to the internal workings of the server or application, which is not commonly exposed to remote users. Therefore, “Attack vector” is marked as “Local”.\n## PoC\n```js\r\nconst inflight = require('inflight');\r\n\r\nfunction testInflight() {\r\n  let i = 0;\r\n  function scheduleNext() {\r\n    let key = `key-${i++}`;\r\n    const callback = () => {\r\n    };\r\n    for (let j = 0; j < 1000000; j++) {\r\n      inflight(key, callback);\r\n    }\r\n\r\n    setImmediate(scheduleNext);\r\n  }\r\n\r\n\r\n  if (i % 100 === 0) {\r\n    console.log(process.memoryUsage());\r\n  }\r\n\r\n  scheduleNext();\r\n}\r\n\r\ntestInflight();\r\n```\n## Remediation\nThere is no fixed version for `inflight`.\n## References\n- [GitHub Issue](https://github.com/isaacs/inflight/issues/5)\n- [GitHub PR](https://github.com/logdna/logdna-agent/pull/157)\n",
+        "epssDetails": null,
+        "identifiers": {
+          "CVE": [],
+          "CWE": [
+            "CWE-772"
+          ]
+        },
+        "packageName": "inflight",
+        "proprietary": false,
+        "creationTime": "2023-11-30T12:51:43.483198Z",
+        "functions_new": [],
+        "alternativeIds": [],
+        "disclosureTime": "2023-11-28T12:47:27Z",
+        "exploitDetails": {
+          "sources": [
+            "Snyk"
+          ],
+          "maturityLevels": [
+            {
+              "type": "secondary",
+              "level": "Proof of Concept",
+              "format": "CVSSv3"
+            },
+            {
+              "type": "primary",
+              "level": "Proof of Concept",
+              "format": "CVSSv4"
+            }
+          ]
+        },
+        "packageManager": "npm",
+        "publicationTime": "2023-11-30T12:52:55.469185Z",
+        "severityBasedOn": "CVSS",
+        "modificationTime": "2026-05-21T02:01:45.056683Z",
+        "socialTrendAlert": false,
+        "packagePopularityRank": 99,
+        "from": [
+          "package.json@*",
+          "exceljs@4.4.0",
+          "archiver@5.3.2",
+          "zip-stream@4.1.1",
+          "archiver-utils@3.0.4",
+          "glob@7.2.3",
+          "inflight@1.0.6"
+        ],
+        "upgradePath": [],
+        "isUpgradable": false,
+        "isPatchable": false,
+        "isPinnable": false,
+        "isRuntime": false,
+        "name": "inflight",
+        "version": "1.0.6",
+        "severityWithCritical": "medium"
+      },
+      {
+        "id": "SNYK-JS-QS-21755395",
+        "title": "Improper Encoding or Escaping of Output",
+        "CVSSv3": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N/E:P",
+        "credit": [
+          "DucMinhNe"
+        ],
+        "semver": {
+          "vulnerable": [
+            ">=6.12.0 <6.16.2"
+          ]
+        },
+        "exploit": "Proof of Concept",
+        "fixedIn": [
+          "6.16.2"
+        ],
+        "patches": [],
+        "insights": {
+          "triageAdvice": null
+        },
+        "language": "js",
+        "severity": "medium",
+        "cvssScore": 6.3,
+        "functions": [],
+        "malicious": false,
+        "isDisputed": false,
+        "moduleName": "qs",
+        "references": [
+          {
+            "url": "https://github.com/ljharb/qs/security/advisories/GHSA-w4cr-vjpx-p82q",
+            "title": "GitHub Advisory"
+          },
+          {
+            "url": "https://github.com/ljharb/qs/commit/234d5051f5071efaa025a7ca9e4d34a56a460a1b",
+            "title": "GitHub Commit"
+          },
+          {
+            "url": "https://github.com/ljharb/qs/commit/5d3b1b9ec6afd0cfc760c8e12862873789a32fc8",
+            "title": "GitHub Commit"
+          },
+          {
+            "url": "https://github.com/ljharb/qs/issues/626",
+            "title": "GitHub Issue"
+          },
+          {
+            "url": "https://github.com/ljharb/qs/pull/561",
+            "title": "GitHub PR"
+          }
+        ],
+        "cvssDetails": [],
+        "cvssSources": [
+          {
+            "type": "primary",
+            "vector": "CVSS:4.0/AV:N/AC:H/AT:N/PR:N/UI:N/VC:N/VI:L/VA:N/SC:N/SI:N/SA:N/E:P",
+            "assigner": "Snyk",
+            "severity": "medium",
+            "baseScore": 6.3,
+            "cvssVersion": "4.0",
+            "modificationTime": "2026-10-28T15:33:45.908187Z"
+          },
+          {
+            "type": "secondary",
+            "vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N/E:P",
+            "assigner": "Snyk",
+            "severity": "low",
+            "baseScore": 3.7,
+            "cvssVersion": "3.1",
+            "modificationTime": "2026-10-28T15:33:45.908187Z"
+          }
+        ],
+        "description": "## Overview\n[qs](https://www.npmjs.com/package/qs) is a querystring parser that supports nesting and arrays, with a depth limit.\n\nAffected versions of this package are vulnerable to Improper Encoding or Escaping of Output via the `stringify` function when the `allowEmptyArrays` option is enabled. When an object key contains special characters (such as `&`, `=`, or `#`) and its value is an empty array, the key is returned without encoding, allowing an attacker who controls a key name to inject arbitrary query-string parameters or URL fragments into the serialized output. A consumer that parses the resulting string will see attacker-controlled key-value pairs that were not present in the original object.\n## PoC\n```js\r\nvar qs = require(\"qs\");\r\n\r\nvar query = qs.stringify({ q: \"hi\", \"x&apiKey=evil&y\": [] }, { allowEmptyArrays: true });\r\n// \"q=hi&x&apiKey=evil&y[]\"\r\nqs.parse(query);\r\n// { q: \"hi\", x: \"\", apiKey: \"evil\", y: [\"\"] }\r\n\r\nqs.stringify({ \"x#\": [], z: \"1\" }, { allowEmptyArrays: true });\r\n// \"x#[]&z=1\": in a URL, everything after \"#\" becomes the fragment\r\n```\r\n\r\n**Note:** The PoC uses the `qs` npm package with the `allowEmptyArrays` option and states no specific runtime version or operating system.\n## Remediation\nUpgrade `qs` to version 6.16.2 or higher.\n## References\n- [GitHub Advisory](https://github.com/ljharb/qs/security/advisories/GHSA-w4cr-vjpx-p82q)\n- [GitHub Commit](https://github.com/ljharb/qs/commit/234d5051f5071efaa025a7ca9e4d34a56a460a1b)\n- [GitHub Commit](https://github.com/ljharb/qs/commit/5d3b1b9ec6afd0cfc760c8e12862873789a32fc8)\n- [GitHub Issue](https://github.com/ljharb/qs/issues/626)\n- [GitHub PR](https://github.com/ljharb/qs/pull/561)\n",
+        "epssDetails": {
+          "percentile": "0.21119",
+          "probability": "0.00286",
+          "modelVersion": "v2026.06.15"
+        },
+        "identifiers": {
+          "CVE": [
+            "CVE-2026-110910"
+          ],
+          "CWE": [
+            "CWE-116"
+          ],
+          "GHSA": [
+            "GHSA-w4cr-vjpx-p82q"
+          ]
+        },
+        "packageName": "qs",
+        "proprietary": false,
+        "creationTime": "2026-10-27T14:36:38.486792Z",
+        "functions_new": [],
+        "alternativeIds": [],
+        "disclosureTime": "2026-10-27T08:31:46Z",
+        "exploitDetails": {
+          "sources": [
+            "Snyk"
+          ],
+          "maturityLevels": [
+            {
+              "type": "secondary",
+              "level": "Proof of Concept",
+              "format": "CVSSv3"
+            },
+            {
+              "type": "primary",
+              "level": "Proof of Concept",
+              "format": "CVSSv4"
+            }
+          ]
+        },
+        "packageManager": "npm",
+        "publicationTime": "2026-10-27T14:36:38.663296Z",
+        "severityBasedOn": "CVSS",
+        "modificationTime": "2026-10-28T15:33:45.908187Z",
+        "socialTrendAlert": false,
+        "packagePopularityRank": 99,
+        "from": [
+          "package.json@*",
+          "express@4.22.3",
+          "body-parser@1.20.9",
+          "qs@6.16.1"
+        ],
+        "upgradePath": [
+          false,
+          "express@4.22.3",
+          "body-parser@1.20.9",
+          "qs@6.16.2"
+        ],
+        "isUpgradable": true,
+        "isPatchable": false,
+        "isPinnable": false,
+        "isRuntime": false,
+        "name": "qs",
+        "version": "6.16.1",
+        "severityWithCritical": "medium"
+      }
+    ],
+    "upgrade": {},
+    "patch": {},
+    "ignore": {},
+    "pin": {}
+  },
+  "filesystemPolicy": false,
+  "filtered": {
+    "ignore": [],
+    "patch": []
+  },
+  "uniqueCount": 2,
+  "projectName": "package.json",
+  "displayTargetFile": "package-lock.json",
+  "hasUnknownVersions": false,
+  "path": "C:\\Users\\Admin\\.gemini\\antigravity\\worktrees\\final_project_Backend\\fix_security_vulnerabilities"
+}

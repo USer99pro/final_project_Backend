@@ -1,3 +1,5 @@
+const rateLimit = require('express-rate-limit');
+const { getSafeUploadPath, safeDeleteFile } = require('../utils/safePath');
 'use strict';
 
 const fs = require('fs');
@@ -59,7 +61,11 @@ const uploadPdf = multer({
 function verifyPdfMagic(req, res, next) {
   if (!req.file) return next(); // No file uploaded — let route handle it
 
-  const filePath = req.file.path;
+  const safe = getSafeUploadPath(uploadDir, req.file.filename || req.file.path);
+  if (!safe) {
+    return res.status(400).json({ error: 'ชื่อไฟล์ไม่ถูกต้อง' });
+  }
+  const filePath = safe.safePath;
   let fd;
   try {
     // Read first 4 bytes only
@@ -72,16 +78,15 @@ function verifyPdfMagic(req, res, next) {
     // %PDF magic: 25 50 44 46
     if (buf[0] !== 0x25 || buf[1] !== 0x50 || buf[2] !== 0x44 || buf[3] !== 0x46) {
       // Delete the non-PDF file immediately
-      try { fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
+      safeDeleteFile(uploadDir, filePath);
       return res.status(400).json({ error: 'ไฟล์ที่อัปโหลดไม่ใช่ PDF จริง (magic bytes ไม่ตรง)' });
     }
   } catch (err) {
     if (fd !== undefined) { try { fs.closeSync(fd); } catch (_) { /* ignore */ } }
-    try { fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
+    safeDeleteFile(uploadDir, filePath);
     return res.status(500).json({ error: 'ไม่สามารถตรวจสอบไฟล์ได้' });
   }
 
   next();
 }
-
 module.exports = { uploadPdf, uploadDir, verifyPdfMagic };

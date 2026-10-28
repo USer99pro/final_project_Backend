@@ -1,3 +1,4 @@
+const { Readable } = require('stream');
 'use strict';
 
 const ExcelJS = require('exceljs');
@@ -129,7 +130,16 @@ function getCellText(cell) {
  */
 async function parseSpreadsheetBuffer(buffer) {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  try {
+    await workbook.xlsx.load(buffer);
+  } catch (err) {
+    try {
+      const stream = Readable.from(buffer);
+      await workbook.csv.read(stream);
+    } catch (_) {
+      throw err;
+    }
+  }
 
   if (!workbook.worksheets || workbook.worksheets.length === 0) {
     throw new Error('ไม่พบแผ่นงาน (Sheet) ในไฟล์ที่อัปโหลด');

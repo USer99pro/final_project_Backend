@@ -1,3 +1,8 @@
+function toSafeString(val) {
+  return typeof val === 'string' ? val.trim() : '';
+}
+const { fileDownloadLimiter } = require('../middleware/rateLimiter');
+const { getSafeUploadPath } = require('../utils/safePath');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
@@ -86,7 +91,7 @@ router.get('/projects', async (req, res) => {
 });
 
 /** GET /api/public/projects/:id/file */
-router.get('/projects/:id/file', async (req, res) => {
+router.get('/projects/:id/file', fileDownloadLimiter, async (req, res) => {
   try {
     const item = await Content.findById(req.params.id);
     if (!item) return res.status(404).json({ error: 'ไม่พบโปรเจกต์' });
@@ -113,18 +118,18 @@ router.get('/projects/:id/file', async (req, res) => {
       return res.send(pdf.data);
     }
 
-    // 2. Fallback to local disk
-    const filePath = path.join(uploadDir, item.pdfFilename);
-    if (!fs.existsSync(filePath)) {
+    // 2. Fallback to local disk with safe path validation
+    const safe = getSafeUploadPath(uploadDir, item.pdfFilename);
+    if (!safe || !fs.existsSync(safe.safePath)) {
       return res.status(404).json({ error: 'ไฟล์ไม่พบบนเซิร์ฟเวอร์' });
     }
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
-      `${disposition}; filename="${encodeURIComponent(item.pdfOriginalName || item.pdfFilename)}"`
+      `${disposition}; filename="${encodeURIComponent(item.pdfOriginalName || safe.safeName)}"`
     );
-    res.sendFile(path.resolve(filePath), (err) => {
+    res.sendFile(safe.safeName, { root: safe.baseDir }, (err) => {
       if (err) {
         console.error('[SendFile Error]', err);
         if (!res.headersSent) {
@@ -194,17 +199,18 @@ router.get('/tags', async (req, res) => {
 router.get('/advisors', async (req, res) => {
   try {
     const filter = { isActive: true };
-    const search = req.query.q || req.query.search;
+    const search = toSafeString(req.query?.q) || toSafeString(req.query?.search) || null;
 
-    if (req.query.department) {
+    if (typeof req.query.department === 'string' && req.query.department.trim()) {
+      const dept = req.query.department.trim();
       filter.$or = [
-        { department: req.query.department },
-        { departmentName: new RegExp(escapeRegex(req.query.department), 'i') },
+        { department: dept },
+        { departmentName: new RegExp(escapeRegex(dept), 'i') },
       ];
     }
 
-    if (req.query.expertise) {
-      filter.expertise = new RegExp(escapeRegex(req.query.expertise), 'i');
+    if (typeof req.query.expertise === 'string' && req.query.expertise.trim()) {
+      filter.expertise = new RegExp(escapeRegex(req.query.expertise.trim()), 'i');
     }
 
     if (search) {

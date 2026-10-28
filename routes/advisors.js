@@ -1,3 +1,6 @@
+function toSafeString(val) {
+  return typeof val === 'string' ? val.trim() : '';
+}
 const express = require('express');
 const Advisor = require('../models/Advisor');
 const Department = require('../models/Department');
@@ -20,18 +23,19 @@ router.get('/', async (req, res) => {
       filter.isActive = true; // default list active advisors
     }
 
-    if (req.query.department) {
+    if (typeof req.query.department === 'string' && req.query.department.trim()) {
+      const dept = req.query.department.trim();
       filter.$or = [
-        { department: req.query.department },
-        { departmentName: new RegExp(escapeRegex(req.query.department), 'i') },
+        { department: dept },
+        { departmentName: new RegExp(escapeRegex(dept), 'i') },
       ];
     }
 
-    if (req.query.expertise) {
-      filter.expertise = new RegExp(escapeRegex(req.query.expertise), 'i');
+    if (typeof req.query.expertise === 'string' && req.query.expertise.trim()) {
+      filter.expertise = new RegExp(escapeRegex(req.query.expertise.trim()), 'i');
     }
 
-    const search = req.query.q || req.query.search;
+    const search = toSafeString(req.query?.q) || toSafeString(req.query?.search) || null;
     if (search) {
       const rx = new RegExp(escapeRegex(search), 'i');
       const searchClauses = [

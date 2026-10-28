@@ -1,3 +1,9 @@
+function toSafeString(val) {
+  return typeof val === 'string' ? val.trim() : '';
+}
+const rateLimit = require('express-rate-limit');
+const { fileUploadLimiter } = require('../middleware/rateLimiter');
+const { getSafeUploadPath, safeDeleteFile } = require('../utils/safePath');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
@@ -27,6 +33,9 @@ function isValidId(id) {
 }
 
 const router = express.Router();
+
+const adminWorkLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 60 });
+router.use('/works', adminWorkLimiter);
 
 router.use(authenticate, requireAdmin);
 router.use('/analytics', analyticsRoutes);
@@ -90,11 +99,12 @@ router.get('/dashboard', async (_req, res) => {
 router.get('/users', async (req, res) => {
   try {
     const filter = {};
-    if (req.query.role) filter.role = req.query.role;
-    if (req.query.isActive) filter.isActive = req.query.isActive === 'true';
-    if (req.query.major) filter.major = String(req.query.major).trim();
-    if (req.query.search) {
-      const search = escapeRegex(req.query.search);
+    if (typeof req.query.role === 'string' && req.query.role.trim()) filter.role = req.query.role.trim();
+    if (typeof req.query.isActive === 'string') filter.isActive = req.query.isActive === 'true';
+    if (typeof req.query.major === 'string' && req.query.major.trim()) filter.major = req.query.major.trim();
+    const rawSearch = toSafeString(req.query?.search);
+    if (rawSearch) {
+      const search = escapeRegex(rawSearch);
       filter.$or = [
         { fullName: new RegExp(search, 'i') },
         { email: new RegExp(search, 'i') },
@@ -377,21 +387,15 @@ async function adminResolveTagIds(tagValue, keywordValue, userId) {
 
 async function removePdfFile(filename) {
   if (!filename) return;
-  const filePath = path.join(uploadDir, filename);
-  // F10: Path-prefix guard — only allow deletions inside uploadDir
-  if (!path.resolve(filePath).startsWith(path.resolve(uploadDir) + path.sep) &&
-      path.resolve(filePath) !== path.resolve(uploadDir)) {
-    console.error('[removePdfFile] Blocked suspicious path:', filePath);
-    return;
-  }
-  if (fs.existsSync(filePath)) {
-    try { fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
-  }
-  try { await PdfFile.deleteOne({ filename }); } catch (_) { /* ignore */ }
+  safeDeleteFile(uploadDir, filename);
+  try {
+    const safeName = path.basename(filename);
+    await PdfFile.deleteOne({ filename: safeName });
+  } catch (_) { /* ignore */ }
 }
 
 /** PATCH /api/admin/works/:id — Admin edit any work (no department restriction) */
-router.patch('/works/:id', uploadPdf.single('pdf'), verifyPdfMagic, async (req, res) => {
+router.patch('/works/:id', adminWorkLimiter, uploadPdf.single('pdf'), verifyPdfMagic, async (req, res) => {
   const uploadedPath = req.file?.path;
   try {
     if (!isValidId(req.params.id)) {
@@ -462,17 +466,20 @@ router.patch('/works/:id', uploadPdf.single('pdf'), verifyPdfMagic, async (req, 
 
     if (req.file) {
       await removePdfFile(item.pdfFilename);
-      const fileBuffer = fs.readFileSync(req.file.path);
-      await PdfFile.create({
-        filename: req.file.filename,
-        originalname: req.file.originalname,
-        mimetype: req.file.mimetype,
-        size: req.file.size,
-        data: fileBuffer,
-      });
-      try { fs.unlinkSync(req.file.path); } catch (_) { /* ignore */ }
-      item.pdfFilename = req.file.filename;
-      item.pdfOriginalName = req.file.originalname;
+      const safe = getSafeUploadPath(uploadDir, req.file.filename || req.file.path);
+      if (safe) {
+        const fileBuffer = fs.readFileSync(safe.safePath);
+        await PdfFile.create({
+          filename: safe.safeName,
+          originalname: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size,
+          data: fileBuffer,
+        });
+        safeDeleteFile(uploadDir, safe.safePath);
+        item.pdfFilename = safe.safeName;
+        item.pdfOriginalName = req.file.originalname;
+      }
     }
 
     await item.save();
@@ -510,7 +517,7 @@ router.patch('/works/:id', uploadPdf.single('pdf'), verifyPdfMagic, async (req, 
 });
 
 /** DELETE /api/admin/works/:id — Admin delete any work */
-router.delete('/works/:id', async (req, res) => {
+router.delete('/works/:id', adminWorkLimiter, async (req, res) => {
   try {
     if (!isValidId(req.params.id)) return res.status(400).json({ error: 'Work ID ไม่ถูกต้อง' });
     const item = await Content.findById(req.params.id);
