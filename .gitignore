@@ -70,3 +70,6 @@ skills-lock.json
 .github
 .github/
 .github/*
+
+sec/
+sec/*
