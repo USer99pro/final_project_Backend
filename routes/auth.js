@@ -9,6 +9,7 @@ const {
   authenticate,
   recordLogin,
 } = require('../middleware/auth');
+const { isValidEmailAddress } = require('../utils/email');
 const { stripVersion } = require('../utils/serialize');
 const { sendError } = require('../utils/sendError');
 
@@ -31,8 +32,7 @@ router.post('/register', async (req, res) => {
       });
     }
     // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(String(email).trim())) {
+    if (!isValidEmailAddress(String(email))) {
       return res.status(400).json({ error: 'อีเมลไม่ถูกต้อง' });
     }
     if (password !== confirmPassword) {
