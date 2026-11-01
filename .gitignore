@@ -71,5 +71,5 @@ skills-lock.json
 .github/
 .github/*
 
-sec/
-sec/*
+report
+report/*
