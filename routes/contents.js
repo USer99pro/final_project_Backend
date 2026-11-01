@@ -1,3 +1,6 @@
+const rateLimit = require('express-rate-limit');
+const { fileUploadLimiter } = require('../middleware/rateLimiter');
+const { getSafeUploadPath, safeDeleteFile } = require('../utils/safePath');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
@@ -9,15 +12,22 @@ const Tag = require('../models/Tag');
 const Category = require('../models/Category');
 const PdfFile = require('../models/PdfFile');
 const { authenticate, isOwnerOrAdmin } = require('../middleware/auth');
-const { uploadPdf, resolvePdfPath, verifyPdfMagic } = require('../middleware/uploadPdf');
-const { fileLimiter } = require('../middleware/rateLimiter');
+const { uploadPdf, uploadDir } = require('../middleware/uploadPdf');
 const { stripVersion } = require('../utils/serialize');
 const { enrichContent } = require('../utils/paths');
 const { logActivity } = require('../utils/activity');
-const { buildResearchFilter, validateResearchQuery } = require('../utils/searchFilter');
+const { buildResearchFilter } = require('../utils/searchFilter');
 const { sendError } = require('../utils/sendError');
 
 const router = express.Router();
+
+const contentsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+router.use('/', contentsLimiter);
 
 function parseIdList(value) {
   if (value == null || value === '') return [];
@@ -129,16 +139,10 @@ async function validateRefs(categoryId, tagIds) {
 
 async function removePdfFile(filename) {
   if (!filename) return;
-  const filePath = resolvePdfPath(filename);
-  if (filePath && fs.existsSync(filePath)) {
-    try {
-      fs.unlinkSync(filePath);
-    } catch (err) {
-      console.error('[RemovePdfFile] Failed to delete file:', err.message);
-    }
-  }
+  safeDeleteFile(uploadDir, filename);
   try {
-    await PdfFile.deleteOne({ filename });
+    const safeName = path.basename(filename);
+    await PdfFile.deleteOne({ filename: safeName });
   } catch (err) {
     console.error('[RemovePdfFile] Failed to delete DB record:', err.message);
   }
@@ -181,12 +185,6 @@ router.use(authenticate);
 
 router.get('/', async (req, res) => {
   try {
-    const queryError = validateResearchQuery(req.query);
-    if (queryError) return res.status(400).json({ error: queryError });
-    if (Object.keys(req.query).length > 20 || (req.query.status !== undefined &&
-        (typeof req.query.status !== 'string' || !['draft', 'published'].includes(req.query.status)))) {
-      return res.status(400).json({ error: 'Invalid query parameters' });
-    }
     let filter;
     if (req.user.role === 'admin') {
       filter = await buildResearchFilter(req.query, { publishedOnly: false });
@@ -233,7 +231,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', fileLimiter, uploadPdf.single('pdf'), verifyPdfMagic, async (req, res) => {
+router.post('/', fileUploadLimiter, uploadPdf.single('pdf'), async (req, res) => {
   const uploadedPath = req.file?.path;
 
   try {
@@ -293,18 +291,17 @@ router.post('/', fileLimiter, uploadPdf.single('pdf'), verifyPdfMagic, async (re
     });
 
     if (req.file) {
-      const fileBuffer = fs.readFileSync(req.file.path);
-      await PdfFile.create({
-        filename: req.file.filename,
-        originalname: req.file.originalname,
-        mimetype: req.file.mimetype,
-        size: req.file.size,
-        data: fileBuffer,
-      });
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (_) {
-        /* ignore */
+      const safe = getSafeUploadPath(uploadDir, req.file.filename || req.file.path);
+      if (safe) {
+        const fileBuffer = fs.readFileSync(safe.safePath);
+        await PdfFile.create({
+          filename: safe.safeName,
+          originalname: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size,
+          data: fileBuffer,
+        });
+        safeDeleteFile(uploadDir, safe.safePath);
       }
     }
 
@@ -331,7 +328,7 @@ router.post('/', fileLimiter, uploadPdf.single('pdf'), verifyPdfMagic, async (re
   }
 });
 
-router.patch('/:id', fileLimiter, uploadPdf.single('pdf'), verifyPdfMagic, async (req, res) => {
+router.patch('/:id', fileUploadLimiter, uploadPdf.single('pdf'), async (req, res) => {
   const uploadedPath = req.file?.path;
 
   try {
@@ -408,22 +405,21 @@ router.patch('/:id', fileLimiter, uploadPdf.single('pdf'), verifyPdfMagic, async
     if (req.file) {
       await removePdfFile(item.pdfFilename);
 
-      const fileBuffer = fs.readFileSync(req.file.path);
-      await PdfFile.create({
-        filename: req.file.filename,
-        originalname: req.file.originalname,
-        mimetype: req.file.mimetype,
-        size: req.file.size,
-        data: fileBuffer,
-      });
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (_) {
-        /* ignore */
-      }
+      const safe = getSafeUploadPath(uploadDir, req.file.filename || req.file.path);
+      if (safe) {
+        const fileBuffer = fs.readFileSync(safe.safePath);
+        await PdfFile.create({
+          filename: safe.safeName,
+          originalname: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size,
+          data: fileBuffer,
+        });
+        safeDeleteFile(uploadDir, safe.safePath);
 
-      item.pdfFilename = req.file.filename;
-      item.pdfOriginalName = req.file.originalname;
+        item.pdfFilename = safe.safeName;
+        item.pdfOriginalName = req.file.originalname;
+      }
     }
 
     await item.save();
@@ -452,7 +448,7 @@ router.patch('/:id', fileLimiter, uploadPdf.single('pdf'), verifyPdfMagic, async
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', fileUploadLimiter, async (req, res) => {
   try {
     const item = await Content.findById(req.params.id);
     if (!item) return res.status(404).json({ error: 'ไม่พบเนื้อหา' });

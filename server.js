@@ -5,7 +5,7 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const { securityHeaders, permissionsPolicy } = require('./middleware/securityHeaders');
-const { globalLimiter, authLimiter, loginLimiter, analyticsLimiter } = require('./middleware/rateLimiter');
+const { globalLimiter, authLimiter, analyticsLimiter } = require('./middleware/rateLimiter');
 const analyticsTrackRouter = require('./routes/analyticsTrack');
 const { connectDB } = require('./config/db');
 const authRouter = require('./routes/auth');
@@ -126,7 +126,6 @@ app.all('/api/auth/better/*', authLimiter, async (req, res, next) => {
   }
 });
 
-app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/contents', contentsRouter);

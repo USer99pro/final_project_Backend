@@ -1,3 +1,6 @@
+function toSafeString(val) {
+  return typeof val === 'string' ? val.trim() : '';
+}
 const express = require('express');
 const mongoose = require('mongoose');
 const User = require('../models/User');
@@ -6,7 +9,7 @@ const Advisor = require('../models/Advisor');
 const Department = require('../models/Department');
 const { authenticate, requireAdmin, requireGraduate, revokeAllUserTokens } = require('../middleware/auth');
 const { stripVersion } = require('../utils/serialize');
-const { escapeRegex, validateAdvisorQuery } = require('../utils/searchFilter');
+const { escapeRegex } = require('../utils/searchFilter');
 const { sendError } = require('../utils/sendError');
 const { uploadSpreadsheet } = require('../middleware/uploadSpreadsheet');
 const { processUserImport, generateImportTemplate } = require('../utils/userImport');
@@ -42,8 +45,6 @@ router.get('/', async (req, res) => {
  */
 router.get('/advisors', async (req, res) => {
   try {
-    const queryError = validateAdvisorQuery(req.query);
-    if (queryError) return res.status(400).json({ error: queryError });
     const filter = {};
     if (req.user.role === 'admin' && (req.query.isActive === 'false' || req.query.isActive === 'all')) {
       if (req.query.isActive === 'false') filter.isActive = false;
@@ -51,19 +52,19 @@ router.get('/advisors', async (req, res) => {
       filter.isActive = true;
     }
 
-    const deptQuery = req.query.department || req.query.major;
-    if (deptQuery) {
+    const rawDept = typeof req.query.department === 'string' ? req.query.department.trim() : (typeof req.query.major === 'string' ? req.query.major.trim() : '');
+    if (rawDept) {
       filter.$or = [
-        { department: deptQuery },
-        { departmentName: new RegExp(escapeRegex(deptQuery), 'i') },
+        { department: rawDept },
+        { departmentName: new RegExp(escapeRegex(rawDept), 'i') },
       ];
     }
 
-    if (req.query.expertise) {
-      filter.expertise = new RegExp(escapeRegex(req.query.expertise), 'i');
+    if (typeof req.query.expertise === 'string' && req.query.expertise.trim()) {
+      filter.expertise = new RegExp(escapeRegex(req.query.expertise.trim()), 'i');
     }
 
-    const search = req.query.q || req.query.search;
+    const search = toSafeString(req.query?.q) || toSafeString(req.query?.search) || null;
     if (search) {
       const rx = new RegExp(escapeRegex(search), 'i');
       const searchClauses = [

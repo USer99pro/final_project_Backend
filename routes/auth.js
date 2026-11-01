@@ -1,3 +1,4 @@
+const rateLimit = require('express-rate-limit');
 const express = require('express');
 const crypto = require('crypto');
 const User = require('../models/User');
@@ -11,8 +12,17 @@ const {
 } = require('../middleware/auth');
 const { stripVersion } = require('../utils/serialize');
 const { sendError } = require('../utils/sendError');
+const { authLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+router.use('/login', loginLimiter);
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
@@ -21,7 +31,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** POST /api/auth/register — Graduate student registration */
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   try {
     const { studentId, fullName, major, email, password, confirmPassword } = req.body;
 
@@ -70,14 +80,9 @@ router.post('/register', async (req, res) => {
 });
 
 /** POST /api/auth/login */
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   try {
     const { email, studentId, username, identifier, password } = req.body;
-    const suppliedIdentifiers = [identifier, username, studentId, email].filter((value) => value !== undefined);
-    if (suppliedIdentifiers.some((value) => typeof value !== 'string' || value.length > 254) ||
-        typeof password !== 'string' || password.length > 128) {
-      return res.status(400).json({ error: 'ข้อมูลเข้าสู่ระบบไม่ถูกต้อง' });
-    }
     const loginIdentifier = identifier || username || studentId || email;
     if (!loginIdentifier || !password) {
       return res.status(400).json({ error: 'กรุณากรอกรหัสนักศึกษา (หรืออีเมล) และรหัสผ่าน' });

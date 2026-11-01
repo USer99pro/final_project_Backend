@@ -1,3 +1,5 @@
+const { fileDownloadLimiter } = require('../middleware/rateLimiter');
+const { getSafeUploadPath } = require('../utils/safePath');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
@@ -5,8 +7,7 @@ const Content = require('../models/Content');
 const { isValidObjectId } = require('mongoose');
 const PdfFile = require('../models/PdfFile');
 const { authenticate, isOwnerOrAdmin } = require('../middleware/auth');
-const { uploadDir, resolvePdfPath } = require('../middleware/uploadPdf');
-const { fileLimiter } = require('../middleware/rateLimiter');
+const { uploadDir } = require('../middleware/uploadPdf');
 const { enrichContent } = require('../utils/paths');
 const { stripVersion } = require('../utils/serialize');
 const { sendError } = require('../utils/sendError');
@@ -71,7 +72,7 @@ router.get('/papers/:id', async (req, res) => {
  * GET /api/uploads/papers/:id/file
  * Download/view PDF file (login required)
  */
-router.get('/papers/:id/file', fileLimiter, async (req, res) => {
+router.get('/papers/:id/file', async (req, res) => {
   try {
     const item = await Content.findById(req.params.id);
     if (!item) return res.status(404).json({ error: 'ไม่พบเอกสาร' });
@@ -81,8 +82,6 @@ router.get('/papers/:id/file', fileLimiter, async (req, res) => {
     if (!item.pdfFilename) {
       return res.status(404).json({ error: 'ไม่มีไฟล์ PDF' });
     }
-    const safeFilePath = resolvePdfPath(item.pdfFilename);
-    if (!safeFilePath) return res.status(404).json({ error: 'ไฟล์ไม่พบบนเซิร์ฟเวอร์' });
 
     // 1. Try to serve from MongoDB
     const pdf = await PdfFile.findOne({ filename: item.pdfFilename });
@@ -96,16 +95,17 @@ router.get('/papers/:id/file', fileLimiter, async (req, res) => {
     }
 
     // 2. Fallback to local disk
-    if (!fs.existsSync(safeFilePath)) {
+    const safe = getSafeUploadPath(uploadDir, item.pdfFilename);
+    if (!safe || !fs.existsSync(safe.safePath)) {
       return res.status(404).json({ error: 'ไฟล์ไม่พบบนเซิร์ฟเวอร์' });
     }
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
       'Content-Disposition',
-      `inline; filename="${encodeURIComponent(item.pdfOriginalName || item.pdfFilename)}"`
+      `inline; filename="${encodeURIComponent(item.pdfOriginalName || safe.safeName)}"`
     );
-    res.sendFile(safeFilePath, (err) => {
+    res.sendFile(safe.safeName, { root: safe.baseDir }, (err) => {
       if (err) {
         console.error('[SendFile Error]', err);
         if (!res.headersSent) {

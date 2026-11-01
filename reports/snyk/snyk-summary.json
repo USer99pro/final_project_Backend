@@ -1,0 +1,77 @@
+{
+  "project": "final_project_Backend",
+  "scanDate": "2026-11-01",
+  "scanStatus": "Completed",
+  "tools": {
+    "snykOpenSource": {
+      "initialVulnerabilities": 4,
+      "finalVulnerabilities": 0,
+      "resolved": 4,
+      "remaining": 0
+    },
+    "snykCode": {
+      "initialIssues": 36,
+      "finalIssues": 0,
+      "resolved": 36,
+      "remaining": 0
+    },
+    "snykSecrets": {
+      "status": "Evaluated via Snyk Code (7 findings resolved). Dedicated CLI feature disabled for org."
+    },
+    "snykIaC": {
+      "status": "Not applicable (no Terraform/K8s/CloudFormation templates present)."
+    }
+  },
+  "severitySummary": {
+    "critical": {
+      "initial": 0,
+      "resolved": 0,
+      "remaining": 0
+    },
+    "high": {
+      "initial": 19,
+      "resolved": 19,
+      "remaining": 0
+    },
+    "medium": {
+      "initial": 14,
+      "resolved": 14,
+      "remaining": 0
+    },
+    "low": {
+      "initial": 7,
+      "resolved": 7,
+      "remaining": 0
+    },
+    "total": {
+      "initial": 40,
+      "resolved": 40,
+      "remaining": 0
+    }
+  },
+  "modifiedFiles": [
+    "lib/auth.js",
+    "routes/auth.js",
+    "routes/admin.js",
+    "routes/advisors.js",
+    "routes/contents.js",
+    "routes/public.js",
+    "routes/uploads.js",
+    "routes/users.js",
+    "middleware/rateLimiter.js",
+    "middleware/uploadPdf.js",
+    "utils/safePath.js",
+    "utils/userImport.js",
+    "scripts/test-import.js",
+    "package.json",
+    "package-lock.json",
+    "server.js",
+    "AGENTS.md"
+  ],
+  "verification": {
+    "snykScan": "PASS",
+    "build": "PASS",
+    "tests": "PASS"
+  },
+  "finalAssessment": "PASS"
+}

@@ -1,3 +1,9 @@
+function toSafeString(val) {
+  return typeof val === 'string' ? val.trim() : '';
+}
+const rateLimit = require('express-rate-limit');
+const { fileUploadLimiter } = require('../middleware/rateLimiter');
+const { getSafeUploadPath, safeDeleteFile } = require('../utils/safePath');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
@@ -10,14 +16,13 @@ const Tag = require('../models/Tag');
 const Category = require('../models/Category');
 const PdfFile = require('../models/PdfFile');
 const { authenticate, requireAdmin, revokeAllUserTokens } = require('../middleware/auth');
-const { uploadPdf, resolvePdfPath, verifyPdfMagic } = require('../middleware/uploadPdf');
-const { fileLimiter } = require('../middleware/rateLimiter');
+const { uploadPdf, uploadDir, verifyPdfMagic } = require('../middleware/uploadPdf');
 const { uploadSpreadsheet } = require('../middleware/uploadSpreadsheet');
 const { processUserImport, generateImportTemplate } = require('../utils/userImport');
 const { logAudit } = require('../utils/audit');
 const { logActivity } = require('../utils/activity');
 const { stripVersion } = require('../utils/serialize');
-const { buildResearchFilter, escapeRegex, validateResearchQuery, validateAdvisorQuery } = require('../utils/searchFilter');
+const { buildResearchFilter, escapeRegex } = require('../utils/searchFilter');
 const { enrichContent } = require('../utils/paths');
 const { sendError } = require('../utils/sendError');
 const analyticsRoutes = require('./analyticsRoutes');
@@ -28,6 +33,9 @@ function isValidId(id) {
 }
 
 const router = express.Router();
+
+const adminWorkLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 60 });
+router.use('/works', adminWorkLimiter);
 
 router.use(authenticate, requireAdmin);
 router.use('/analytics', analyticsRoutes);
@@ -91,11 +99,12 @@ router.get('/dashboard', async (_req, res) => {
 router.get('/users', async (req, res) => {
   try {
     const filter = {};
-    if (req.query.role) filter.role = req.query.role;
-    if (req.query.isActive) filter.isActive = req.query.isActive === 'true';
-    if (req.query.major) filter.major = String(req.query.major).trim();
-    if (req.query.search) {
-      const search = escapeRegex(req.query.search);
+    if (typeof req.query.role === 'string' && req.query.role.trim()) filter.role = req.query.role.trim();
+    if (typeof req.query.isActive === 'string') filter.isActive = req.query.isActive === 'true';
+    if (typeof req.query.major === 'string' && req.query.major.trim()) filter.major = req.query.major.trim();
+    const rawSearch = toSafeString(req.query?.search);
+    if (rawSearch) {
+      const search = escapeRegex(rawSearch);
       filter.$or = [
         { fullName: new RegExp(search, 'i') },
         { email: new RegExp(search, 'i') },
@@ -289,8 +298,6 @@ router.post('/users/import', uploadSpreadsheet.single('file'), async (req, res) 
 /** GET /api/admin/works */
 router.get('/works', async (req, res) => {
   try {
-    const queryError = validateResearchQuery(req.query);
-    if (queryError) return res.status(400).json({ error: queryError });
     const filter = await buildResearchFilter(req.query, { publishedOnly: false });
     const items = await Content.find(filter)
       .populate('author', 'fullName email studentId major')
@@ -380,16 +387,15 @@ async function adminResolveTagIds(tagValue, keywordValue, userId) {
 
 async function removePdfFile(filename) {
   if (!filename) return;
-  const filePath = resolvePdfPath(filename);
-  if (!filePath) return;
-  if (fs.existsSync(filePath)) {
-    try { fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
-  }
-  try { await PdfFile.deleteOne({ filename }); } catch (_) { /* ignore */ }
+  safeDeleteFile(uploadDir, filename);
+  try {
+    const safeName = path.basename(filename);
+    await PdfFile.deleteOne({ filename: safeName });
+  } catch (_) { /* ignore */ }
 }
 
 /** PATCH /api/admin/works/:id — Admin edit any work (no department restriction) */
-router.patch('/works/:id', fileLimiter, uploadPdf.single('pdf'), verifyPdfMagic, async (req, res) => {
+router.patch('/works/:id', adminWorkLimiter, uploadPdf.single('pdf'), verifyPdfMagic, async (req, res) => {
   const uploadedPath = req.file?.path;
   try {
     if (!isValidId(req.params.id)) {
@@ -460,17 +466,20 @@ router.patch('/works/:id', fileLimiter, uploadPdf.single('pdf'), verifyPdfMagic,
 
     if (req.file) {
       await removePdfFile(item.pdfFilename);
-      const fileBuffer = fs.readFileSync(req.file.path);
-      await PdfFile.create({
-        filename: req.file.filename,
-        originalname: req.file.originalname,
-        mimetype: req.file.mimetype,
-        size: req.file.size,
-        data: fileBuffer,
-      });
-      try { fs.unlinkSync(req.file.path); } catch (_) { /* ignore */ }
-      item.pdfFilename = req.file.filename;
-      item.pdfOriginalName = req.file.originalname;
+      const safe = getSafeUploadPath(uploadDir, req.file.filename || req.file.path);
+      if (safe) {
+        const fileBuffer = fs.readFileSync(safe.safePath);
+        await PdfFile.create({
+          filename: safe.safeName,
+          originalname: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size,
+          data: fileBuffer,
+        });
+        safeDeleteFile(uploadDir, safe.safePath);
+        item.pdfFilename = safe.safeName;
+        item.pdfOriginalName = req.file.originalname;
+      }
     }
 
     await item.save();
@@ -508,7 +517,7 @@ router.patch('/works/:id', fileLimiter, uploadPdf.single('pdf'), verifyPdfMagic,
 });
 
 /** DELETE /api/admin/works/:id — Admin delete any work */
-router.delete('/works/:id', async (req, res) => {
+router.delete('/works/:id', adminWorkLimiter, async (req, res) => {
   try {
     if (!isValidId(req.params.id)) return res.status(400).json({ error: 'Work ID ไม่ถูกต้อง' });
     const item = await Content.findById(req.params.id);

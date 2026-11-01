@@ -1,0 +1,7 @@
+{
+  "scanner": "snyk iac test",
+  "status": "NOT_APPLICABLE",
+  "message": "No Infrastructure as Code files (Terraform, CloudFormation, ARM, Kubernetes) present in the repository.",
+  "infrastructureFilesDetected": 0,
+  "vulnerabilities": []
+}
