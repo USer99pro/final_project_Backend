@@ -3,7 +3,7 @@ const Advisor = require('../models/Advisor');
 const Department = require('../models/Department');
 const { authenticate, requireAdmin, requireGraduate } = require('../middleware/auth');
 const { stripVersion } = require('../utils/serialize');
-const { escapeRegex } = require('../utils/searchFilter');
+const { escapeRegex, validateAdvisorQuery } = require('../utils/searchFilter');
 
 const router = express.Router();
 
@@ -13,6 +13,8 @@ const router = express.Router();
  */
 router.get('/', async (req, res) => {
   try {
+    const queryError = validateAdvisorQuery(req.query);
+    if (queryError) return res.status(400).json({ error: queryError });
     const filter = {};
     if (req.query.isActive === 'true' || req.query.isActive === 'false') {
       filter.isActive = req.query.isActive === 'true';

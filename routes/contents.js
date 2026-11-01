@@ -9,11 +9,12 @@ const Tag = require('../models/Tag');
 const Category = require('../models/Category');
 const PdfFile = require('../models/PdfFile');
 const { authenticate, isOwnerOrAdmin } = require('../middleware/auth');
-const { uploadPdf, uploadDir } = require('../middleware/uploadPdf');
+const { uploadPdf, resolvePdfPath, verifyPdfMagic } = require('../middleware/uploadPdf');
+const { fileLimiter } = require('../middleware/rateLimiter');
 const { stripVersion } = require('../utils/serialize');
 const { enrichContent } = require('../utils/paths');
 const { logActivity } = require('../utils/activity');
-const { buildResearchFilter } = require('../utils/searchFilter');
+const { buildResearchFilter, validateResearchQuery } = require('../utils/searchFilter');
 const { sendError } = require('../utils/sendError');
 
 const router = express.Router();
@@ -128,8 +129,8 @@ async function validateRefs(categoryId, tagIds) {
 
 async function removePdfFile(filename) {
   if (!filename) return;
-  const filePath = path.join(uploadDir, filename);
-  if (fs.existsSync(filePath)) {
+  const filePath = resolvePdfPath(filename);
+  if (filePath && fs.existsSync(filePath)) {
     try {
       fs.unlinkSync(filePath);
     } catch (err) {
@@ -180,6 +181,12 @@ router.use(authenticate);
 
 router.get('/', async (req, res) => {
   try {
+    const queryError = validateResearchQuery(req.query);
+    if (queryError) return res.status(400).json({ error: queryError });
+    if (Object.keys(req.query).length > 20 || (req.query.status !== undefined &&
+        (typeof req.query.status !== 'string' || !['draft', 'published'].includes(req.query.status)))) {
+      return res.status(400).json({ error: 'Invalid query parameters' });
+    }
     let filter;
     if (req.user.role === 'admin') {
       filter = await buildResearchFilter(req.query, { publishedOnly: false });
@@ -226,7 +233,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', uploadPdf.single('pdf'), async (req, res) => {
+router.post('/', fileLimiter, uploadPdf.single('pdf'), verifyPdfMagic, async (req, res) => {
   const uploadedPath = req.file?.path;
 
   try {
@@ -324,7 +331,7 @@ router.post('/', uploadPdf.single('pdf'), async (req, res) => {
   }
 });
 
-router.patch('/:id', uploadPdf.single('pdf'), async (req, res) => {
+router.patch('/:id', fileLimiter, uploadPdf.single('pdf'), verifyPdfMagic, async (req, res) => {
   const uploadedPath = req.file?.path;
 
   try {

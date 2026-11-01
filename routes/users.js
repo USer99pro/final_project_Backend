@@ -6,7 +6,7 @@ const Advisor = require('../models/Advisor');
 const Department = require('../models/Department');
 const { authenticate, requireAdmin, requireGraduate, revokeAllUserTokens } = require('../middleware/auth');
 const { stripVersion } = require('../utils/serialize');
-const { escapeRegex } = require('../utils/searchFilter');
+const { escapeRegex, validateAdvisorQuery } = require('../utils/searchFilter');
 const { sendError } = require('../utils/sendError');
 const { uploadSpreadsheet } = require('../middleware/uploadSpreadsheet');
 const { processUserImport, generateImportTemplate } = require('../utils/userImport');
@@ -42,6 +42,8 @@ router.get('/', async (req, res) => {
  */
 router.get('/advisors', async (req, res) => {
   try {
+    const queryError = validateAdvisorQuery(req.query);
+    if (queryError) return res.status(400).json({ error: queryError });
     const filter = {};
     if (req.user.role === 'admin' && (req.query.isActive === 'false' || req.query.isActive === 'all')) {
       if (req.query.isActive === 'false') filter.isActive = false;

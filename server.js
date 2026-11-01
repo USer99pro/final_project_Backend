@@ -5,7 +5,7 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const { securityHeaders, permissionsPolicy } = require('./middleware/securityHeaders');
-const { globalLimiter, authLimiter, analyticsLimiter } = require('./middleware/rateLimiter');
+const { globalLimiter, authLimiter, loginLimiter, analyticsLimiter } = require('./middleware/rateLimiter');
 const analyticsTrackRouter = require('./routes/analyticsTrack');
 const { connectDB } = require('./config/db');
 const authRouter = require('./routes/auth');
@@ -24,6 +24,7 @@ const advisorsRouter = require('./routes/advisors');
 const IS_PROD = process.env.NODE_ENV === 'production';
 
 const app = express();
+app.disable('x-powered-by');
 const PORT = Number(process.env.PORT) || 3000;
 
 // Trust reverse proxy (e.g. Render, Heroku, Cloudflare) to correctly identify client IP in rate limiting
@@ -125,6 +126,7 @@ app.all('/api/auth/better/*', authLimiter, async (req, res, next) => {
   }
 });
 
+app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/contents', contentsRouter);

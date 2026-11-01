@@ -71,4 +71,29 @@ async function buildResearchFilter(query, { publishedOnly = false } = {}) {
   return filter;
 }
 
-module.exports = { buildResearchFilter, escapeRegex };
+function validateResearchQuery(query) {
+  const maxLengths = { q: 160, search: 160, title: 160, researcher: 120, studentName: 120, major: 120, academicYear: 12, category: 64, tag: 64, categoryName: 80, keyword: 80, hasPdf: 5 };
+  for (const [key, maxLength] of Object.entries(maxLengths)) {
+    if (query[key] === undefined) continue;
+    if (typeof query[key] !== 'string' || query[key].length > maxLength) {
+      return `${key} must be a string no longer than ${maxLength} characters`;
+    }
+  }
+  return null;
+}
+
+function validateAdvisorQuery(query) {
+  const limits = { isActive: 5, department: 120, major: 120, expertise: 120, q: 160, search: 160, page: 8, limit: 4 };
+  for (const [key, maxLength] of Object.entries(limits)) {
+    if (query[key] === undefined) continue;
+    if (typeof query[key] !== 'string' || query[key].length > maxLength) return `${key} is invalid`;
+  }
+  for (const key of ['page', 'limit']) {
+    if (query[key] !== undefined && !/^[1-9]\d*$/.test(query[key])) return `${key} must be a positive integer`;
+  }
+  if (query.page && Number(query.page) > 100000) return 'page is too large';
+  if (query.limit && Number(query.limit) > 100) return 'limit must not exceed 100';
+  return null;
+}
+
+module.exports = { buildResearchFilter, escapeRegex, validateResearchQuery, validateAdvisorQuery };

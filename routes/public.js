@@ -8,9 +8,10 @@ const Advisor = require('../models/Advisor');
 const PdfFile = require('../models/PdfFile');
 const User = require('../models/User');
 const Department = require('../models/Department');
-const { uploadDir } = require('../middleware/uploadPdf');
+const { resolvePdfPath } = require('../middleware/uploadPdf');
+const { fileLimiter } = require('../middleware/rateLimiter');
 const { toPublicProject } = require('../utils/publicProject');
-const { buildResearchFilter, escapeRegex } = require('../utils/searchFilter');
+const { buildResearchFilter, escapeRegex, validateResearchQuery } = require('../utils/searchFilter');
 const { stripVersion } = require('../utils/serialize');
 
 const router = express.Router();
@@ -55,6 +56,8 @@ router.get('/stats', async (req, res) => {
 
 router.get('/projects', async (req, res) => {
   try {
+    const queryError = validateResearchQuery(req.query);
+    if (queryError) return res.status(400).json({ error: queryError });
     const filter = await buildResearchFilter(req.query, { publishedOnly: true });
     if (req.query.summary === '1') {
       const items = await Content.find(filter)
@@ -86,8 +89,11 @@ router.get('/projects', async (req, res) => {
 });
 
 /** GET /api/public/projects/:id/file */
-router.get('/projects/:id/file', async (req, res) => {
+router.get('/projects/:id/file', fileLimiter, async (req, res) => {
   try {
+    if (typeof req.query.download !== 'undefined' && req.query.download !== '1' && req.query.download !== '0') {
+      return res.status(400).json({ error: 'download must be 0 or 1' });
+    }
     const item = await Content.findById(req.params.id);
     if (!item) return res.status(404).json({ error: 'ไม่พบโปรเจกต์' });
     if (item.status !== 'published') {
@@ -99,6 +105,8 @@ router.get('/projects/:id/file', async (req, res) => {
     if (!item.pdfFilename) {
       return res.status(404).json({ error: 'ไม่มีไฟล์ PDF' });
     }
+    const safeFilePath = resolvePdfPath(item.pdfFilename);
+    if (!safeFilePath) return res.status(404).json({ error: 'ไฟล์ไม่พบบนเซิร์ฟเวอร์' });
 
     const disposition = req.query.download === '1' ? 'attachment' : 'inline';
 
@@ -114,8 +122,7 @@ router.get('/projects/:id/file', async (req, res) => {
     }
 
     // 2. Fallback to local disk
-    const filePath = path.join(uploadDir, item.pdfFilename);
-    if (!fs.existsSync(filePath)) {
+    if (!fs.existsSync(safeFilePath)) {
       return res.status(404).json({ error: 'ไฟล์ไม่พบบนเซิร์ฟเวอร์' });
     }
 
@@ -124,7 +131,7 @@ router.get('/projects/:id/file', async (req, res) => {
       'Content-Disposition',
       `${disposition}; filename="${encodeURIComponent(item.pdfOriginalName || item.pdfFilename)}"`
     );
-    res.sendFile(path.resolve(filePath), (err) => {
+    res.sendFile(safeFilePath, (err) => {
       if (err) {
         console.error('[SendFile Error]', err);
         if (!res.headersSent) {

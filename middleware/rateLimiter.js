@@ -44,6 +44,22 @@ const authLimiter = rateLimit({
   handler: rateLimitHandler,
 });
 
+const loginLimiter = rateLimit({
+  windowMs: Number(process.env.RATE_LIMIT_LOGIN_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_LOGIN_MAX) || 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+});
+
+const fileLimiter = rateLimit({
+  windowMs: Number(process.env.RATE_LIMIT_FILE_WINDOW_MS) || 15 * 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_FILE_MAX) || 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler,
+});
+
 /**
  * Analytics tracking limiter — public POST /api/analytics
  * Default: 300 requests per 15 minutes per IP.
@@ -57,4 +73,4 @@ const analyticsLimiter = rateLimit({
   handler: rateLimitHandler,
 });
 
-module.exports = { globalLimiter, authLimiter, analyticsLimiter };
+module.exports = { globalLimiter, authLimiter, loginLimiter, fileLimiter, analyticsLimiter };

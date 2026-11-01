@@ -53,6 +53,7 @@ MONGO_DNS_SERVERS=8.8.8.8,1.1.1.1
 
 # JWT Settings
 JWT_SECRET=your_jwt_super_secret_key_here
+BETTER_AUTH_SECRET=generate-a-unique-secret-at-least-32-characters
 ACCESS_TOKEN_EXPIRY=15m
 REFRESH_TOKEN_EXPIRY_DAYS=30
 
@@ -63,7 +64,19 @@ FRONTEND_URL=http://localhost:5173,https://udvc-research.online
 TRUST_PROXY=1
 RATE_LIMIT_GLOBAL_MAX=1000
 RATE_LIMIT_AUTH_MAX=30
+RATE_LIMIT_LOGIN_MAX=10
+RATE_LIMIT_FILE_MAX=30
 ```
+
+Generate a fresh `BETTER_AUTH_SECRET` for each environment with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+The server requires this value in development and production. If the former
+development fallback was used by a deployed instance, rotate the secret and
+invalidate existing sessions.
 
 ### 3. เตรียมฐานข้อมูลและสร้างบัญชี Admin เริ่มต้น (Database Seeding)
 ```bash

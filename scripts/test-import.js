@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const ExcelJS = require('exceljs');
 const assert = require('assert');
+const TEST_PASSWORD = require('crypto').randomBytes(18).toString('hex');
 
 // Helper: build an xlsx Buffer from row data using ExcelJS
 async function buildXlsxBuffer(rows, sheetName = 'Test') {
@@ -77,7 +78,7 @@ const {
       รหัสนักศึกษา: '6501001',
       'ชื่อ-นามสกุล': 'นายทดสอบ ภาษาไทย',
       อีเมล: 'thai_user@udvc.ac.th',
-      รหัสผ่าน: 'SecurePass999',
+      รหัสผ่าน: TEST_PASSWORD,
       สาขาวิชา: 'เทคโนโลยีสารสนเทศ',
       เบอร์โทรศัพท์: '0812345678',
       บทบาท: 'graduate',
@@ -86,7 +87,7 @@ const {
       studentId: '6501002',
       fullName: 'English Header User',
       email: 'english_user@udvc.ac.th',
-      password: 'ValidPass123',
+      password: TEST_PASSWORD,
       major: 'Computer Science',
       phone: '0898765432',
       role: 'graduate',
@@ -99,7 +100,7 @@ const {
   assert.strictEqual(parsedRows[0].studentId, '6501001');
   assert.strictEqual(parsedRows[0].fullName, 'นายทดสอบ ภาษาไทย');
   assert.strictEqual(parsedRows[0].email, 'thai_user@udvc.ac.th');
-  assert.strictEqual(parsedRows[0].password, 'SecurePass999');
+  assert.strictEqual(parsedRows[0].password, TEST_PASSWORD);
   assert.strictEqual(parsedRows[1].studentId, '6501002');
   assert.strictEqual(parsedRows[1].email, 'english_user@udvc.ac.th');
   console.log('✓ Thai and English headers correctly normalized');
@@ -125,7 +126,7 @@ const {
       studentId: '6502003',
       fullName: 'Valid User',
       email: 'valid@udvc.ac.th',
-      password: 'Pass123456',
+      password: TEST_PASSWORD,
       major: 'IT',
     },
   ];
@@ -151,21 +152,21 @@ const {
       studentId: '6503001',
       fullName: 'First Entry',
       email: 'dup@udvc.ac.th',
-      password: 'Pass123456',
+      password: TEST_PASSWORD,
       major: 'IT',
     },
     {
       studentId: '6503002',
       fullName: 'Second Entry (Same Email)',
       email: 'dup@udvc.ac.th', // Duplicate email
-      password: 'Pass123456',
+      password: TEST_PASSWORD,
       major: 'IT',
     },
     {
       studentId: '6503001', // Duplicate studentId
       fullName: 'Third Entry (Same Student ID)',
       email: 'unique@udvc.ac.th',
-      password: 'Pass123456',
+      password: TEST_PASSWORD,
       major: 'IT',
     },
   ];
@@ -180,7 +181,7 @@ const {
   console.log('\n--- Step 6: Testing CSV Format Direct Parsing ---');
   const csvContent =
     'studentId,fullName,email,password,major,phone,role\n' +
-    '6504001,CSV User,csv_user@udvc.ac.th,MySecretPass,Accounting,0811112233,graduate\n';
+    `6504001,CSV User,csv_user@udvc.ac.th,${TEST_PASSWORD},Accounting,0811112233,graduate\n`;
   const csvBuffer = Buffer.from(csvContent, 'utf8');
   const csvResult = await processUserImport(csvBuffer, { dryRun: true });
   assert.strictEqual(csvResult.summary.importedCount, 1);

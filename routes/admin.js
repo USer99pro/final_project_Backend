@@ -10,13 +10,14 @@ const Tag = require('../models/Tag');
 const Category = require('../models/Category');
 const PdfFile = require('../models/PdfFile');
 const { authenticate, requireAdmin, revokeAllUserTokens } = require('../middleware/auth');
-const { uploadPdf, uploadDir, verifyPdfMagic } = require('../middleware/uploadPdf');
+const { uploadPdf, resolvePdfPath, verifyPdfMagic } = require('../middleware/uploadPdf');
+const { fileLimiter } = require('../middleware/rateLimiter');
 const { uploadSpreadsheet } = require('../middleware/uploadSpreadsheet');
 const { processUserImport, generateImportTemplate } = require('../utils/userImport');
 const { logAudit } = require('../utils/audit');
 const { logActivity } = require('../utils/activity');
 const { stripVersion } = require('../utils/serialize');
-const { buildResearchFilter, escapeRegex } = require('../utils/searchFilter');
+const { buildResearchFilter, escapeRegex, validateResearchQuery } = require('../utils/searchFilter');
 const { enrichContent } = require('../utils/paths');
 const { sendError } = require('../utils/sendError');
 const analyticsRoutes = require('./analyticsRoutes');
@@ -288,6 +289,8 @@ router.post('/users/import', uploadSpreadsheet.single('file'), async (req, res) 
 /** GET /api/admin/works */
 router.get('/works', async (req, res) => {
   try {
+    const queryError = validateResearchQuery(req.query);
+    if (queryError) return res.status(400).json({ error: queryError });
     const filter = await buildResearchFilter(req.query, { publishedOnly: false });
     const items = await Content.find(filter)
       .populate('author', 'fullName email studentId major')
@@ -377,13 +380,8 @@ async function adminResolveTagIds(tagValue, keywordValue, userId) {
 
 async function removePdfFile(filename) {
   if (!filename) return;
-  const filePath = path.join(uploadDir, filename);
-  // F10: Path-prefix guard — only allow deletions inside uploadDir
-  if (!path.resolve(filePath).startsWith(path.resolve(uploadDir) + path.sep) &&
-      path.resolve(filePath) !== path.resolve(uploadDir)) {
-    console.error('[removePdfFile] Blocked suspicious path:', filePath);
-    return;
-  }
+  const filePath = resolvePdfPath(filename);
+  if (!filePath) return;
   if (fs.existsSync(filePath)) {
     try { fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
   }
@@ -391,7 +389,7 @@ async function removePdfFile(filename) {
 }
 
 /** PATCH /api/admin/works/:id — Admin edit any work (no department restriction) */
-router.patch('/works/:id', uploadPdf.single('pdf'), verifyPdfMagic, async (req, res) => {
+router.patch('/works/:id', fileLimiter, uploadPdf.single('pdf'), verifyPdfMagic, async (req, res) => {
   const uploadedPath = req.file?.path;
   try {
     if (!isValidId(req.params.id)) {

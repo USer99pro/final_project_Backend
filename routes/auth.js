@@ -73,6 +73,11 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, studentId, username, identifier, password } = req.body;
+    const suppliedIdentifiers = [identifier, username, studentId, email].filter((value) => value !== undefined);
+    if (suppliedIdentifiers.some((value) => typeof value !== 'string' || value.length > 254) ||
+        typeof password !== 'string' || password.length > 128) {
+      return res.status(400).json({ error: 'ข้อมูลเข้าสู่ระบบไม่ถูกต้อง' });
+    }
     const loginIdentifier = identifier || username || studentId || email;
     if (!loginIdentifier || !password) {
       return res.status(400).json({ error: 'กรุณากรอกรหัสนักศึกษา (หรืออีเมล) และรหัสผ่าน' });

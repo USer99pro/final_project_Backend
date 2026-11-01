@@ -14,6 +14,16 @@ const uploadDir = isServerless
   ? path.join('/tmp', 'uploads', 'pdfs')
   : path.join(__dirname, '..', 'uploads', 'pdfs');
 
+const resolvedUploadDir = path.resolve(uploadDir);
+
+function resolvePdfPath(filename) {
+  if (typeof filename !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,250}\.pdf$/i.test(filename)) {
+    return null;
+  }
+  const resolved = path.resolve(resolvedUploadDir, filename);
+  return resolved.startsWith(`${resolvedUploadDir}${path.sep}`) ? resolved : null;
+}
+
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -59,7 +69,10 @@ const uploadPdf = multer({
 function verifyPdfMagic(req, res, next) {
   if (!req.file) return next(); // No file uploaded — let route handle it
 
-  const filePath = req.file.path;
+  const filePath = resolvePdfPath(req.file.filename);
+  if (!filePath || path.resolve(req.file.path) !== filePath) {
+    return res.status(400).json({ error: 'ชื่อไฟล์ที่อัปโหลดไม่ถูกต้อง' });
+  }
   let fd;
   try {
     // Read first 4 bytes only
@@ -84,4 +97,4 @@ function verifyPdfMagic(req, res, next) {
   next();
 }
 
-module.exports = { uploadPdf, uploadDir, verifyPdfMagic };
+module.exports = { uploadPdf, uploadDir, resolvePdfPath, verifyPdfMagic };
